@@ -34,12 +34,11 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudhitdirection" then
 		data.duration = WolfHUD:getSetting("dmg_ind_time", "number")
 		data.t = 0
 		while data.t < data.duration do
-			local dt = coroutine.yield()
-			data.t = data.t + dt
+			data.t = data.t + coroutine.yield()
 			if alive(indicator) then
 				local o = data.t / data.duration
 				indicator:set_color(self:_get_indicator_color(data.damage_type, o))
-				indicator:set_alpha( math.clamp(math.sin(math.deg(o * math.pi)), 0, 1) )
+				indicator:set_alpha( math.clamp(math.sin(o * 180), 0, 1) )
 				if managers.player:player_unit() then
 					local ply_camera = managers.player:player_unit():camera()
 					if ply_camera then
@@ -101,15 +100,17 @@ elseif string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" th
 	function PlayerDamage:_hit_direction(position_vector, damage_type)
 		if position_vector then
 			local armor_left, low_health = (self:get_real_armor() > 0), ((self:get_real_health() / self:_max_health()) <= 0.20)
-			local dmg_type = low_health and HUDHitDirection.DAMAGE_TYPES.CRIT or damage_type or armor_left and HUDHitDirection.DAMAGE_TYPES.ARMOUR or HUDHitDirection.DAMAGE_TYPES.HEALTH
+			local dmg_type = damage_type or armor_left and HUDHitDirection.DAMAGE_TYPES.ARMOUR or low_health and HUDHitDirection.DAMAGE_TYPES.CRIT or HUDHitDirection.DAMAGE_TYPES.HEALTH
 			managers.hud:on_hit_direction(position_vector, dmg_type)
 		end
 	end
-elseif false and string.lower(RequiredScript) == "lib/units/vehicles/vehicledamage" then	
+elseif string.lower(RequiredScript) == "lib/units/vehicles/vehicledamage" then	
+--[[	-- Causes Access violation: Something with the angle calculation of the animation...
 	function VehicleDamage:_hit_direction(position_vector, damage_type)
 		if position_vector then
 			local dmg_type = damage_type or HUDHitDirection.DAMAGE_TYPES.VEHICLE
 			managers.hud:on_hit_direction(position_vector, dmg_type)
 		end
 	end
+--]]
 end

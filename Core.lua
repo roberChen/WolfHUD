@@ -103,16 +103,16 @@ if not _G.WolfHUD then
 		["lib/managers/hud/hudinteraction"] = { "Interaction.lua" },
 		["lib/managers/hud/hudsuspicion"] = { "NumbericSuspicion.lua" },
 		["lib/managers/hud/hudhitdirection"] = { "DamageIndicator.lua" },
-		["lib/managers/enemymanager"] = { "GameInfoManager.lua", "KillCounter.lua" },
+		["lib/managers/enemymanager"] = { "GameInfoManager.lua" },
 		["lib/managers/group_ai_states/groupaistatebase"] = { "GameInfoManager.lua", "PacifiedCivs.lua", "CustomWaypoints.lua" },
-		["lib/managers/missionassetsmanager"] = { "MenuTweaks.lua" },
+		["lib/managers/missionassetsmanager"] = { "BuyAllAsset.lua" },
 		["lib/managers/menu/blackmarketgui"] = { "MenuTweaks.lua" },
 		["lib/managers/menu/stageendscreengui"] = { "MenuTweaks.lua" },
 		["lib/managers/menu/lootdropscreengui"] = { "MenuTweaks.lua" },
 		["lib/managers/menu/skilltreeguinew"] = { "MenuTweaks.lua" },
 		["lib/managers/menu/renderers/menunodeskillswitchgui"] = { "MenuTweaks.lua" },
 		["lib/managers/objectinteractionmanager"] = { "GameInfoManager.lua", "HUDList.lua", "Interaction.lua" },
-		["lib/network/handlers/unitnetworkhandler"] = { "NetworkHandler.lua", "DownCounter.lua", "GameInfoManager.lua" },
+		["lib/network/handlers/unitnetworkhandler"] = { "DownCounter.lua", "GameInfoManager.lua", "NetworkHandler.lua" },
 		["lib/units/props/timergui"] = { "GameInfoManager.lua" },
 		["lib/units/props/digitalgui"] = { "GameInfoManager.lua" },
 		["lib/units/props/securitylockgui"] = { "GameInfoManager.lua" },
@@ -122,6 +122,7 @@ if not _G.WolfHUD then
 		["lib/units/equipment/ammo_bag/ammobagbase"] = { "GameInfoManager.lua" },
 		["lib/units/equipment/bodybags_bag/bodybagsbagbase"] = { "GameInfoManager.lua" },
 		["lib/units/equipment/doctor_bag/doctorbagbase"] = { "DownCounter.lua", "GameInfoManager.lua" },
+		["lib/units/equipment/first_aid_kit/firstaidkitbase"] = { "GameInfoManager.lua" },
 		["lib/units/equipment/ecm_jammer/ecmjammerbase"] = { "GameInfoManager.lua", "EquipmentTweaks.lua" },
 		["lib/units/equipment/grenade_crate/grenadecratebase"] = { "GameInfoManager.lua" },
 		["lib/units/equipment/sentry_gun/sentrygunbase"] = { "GameInfoManager.lua", "KillCounter.lua" },
@@ -153,6 +154,7 @@ if not _G.WolfHUD then
 		["lib/states/ingamewaitingforplayers"] = { "MenuTweaks.lua" },
 		["lib/tweak_data/tweakdata"] = { "MenuTweaks.lua" },	
 		["lib/tweak_data/guitweakdata"] = { "MenuTweaks.lua" },	
+		["lib/tweak_data/assetstweakdata"] = { "BuyAllAsset.lua" },
 		["lib/tweak_data/timespeedeffecttweakdata"] = { "Scripts.lua" },
 		["core/lib/managers/menu/items/coremenuitemslider"] = { "MenuTweaks.lua" },
 		["core/lib/managers/subtitle/coresubtitlepresenter"] = { "EnhancedObjective.lua" },
@@ -229,7 +231,6 @@ if not _G.WolfHUD then
 			SHOW_HEADSHOT_KILLS 					= true,		--KillCounter shows headshot kills
 			SHOW_AI_KILLS 							= true,		--Show KillCounter for Bots
 			SHOW_ACCURACY							= true,
-			max_corpses 							= 100,		--Maximum number of laying around corpses
 		  --Enemy Healthbar
 			show_enemy_healthbar 					= true,		--Show healthbars
 			show_civilian_healthbar 				= false,	--Show Healthbars for Civilians and TeamAI
@@ -382,6 +383,7 @@ if not _G.WolfHUD then
 		  --CustomWaypoints	
 			waypoints_show_ammo_bag 				= true,
 			waypoints_show_doc_bag 					= true,
+			waypoints_show_first_aid_kit			= false,
 			waypoints_show_body_bag 				= true,
 			waypoints_show_grenade_crate 			= true,
 			waypoints_show_sentries 				= false,
@@ -468,9 +470,10 @@ if not _G.WolfHUD then
 				log_table(text)
 				return
 			elseif type(text) == "function" then
-				text = "Error, cannot log function... " 
+				msg_type = "error"
+				text = "Cannot log function... " 
 			end
-			log("[WolfHUD] " .. tostring(text))
+			log(string.format("[WolfHUD] %s: %s", string.upper(msg_type), text))
 		end
 	end
 	
@@ -677,31 +680,36 @@ if MenuNodeMainGui then
 end
 
 Hooks:Add("LocalizationManagerPostInit", "LocalizationManagerPostInit_WolfHUD", function(loc)
-	local chinese = false
-	for k, v in pairs(LuaModManager.Mods) do
-		local info = v.definition
-		if info["name"] == "ChnMod" then
-			chinese = true
-			break
-		end
-	end
-	if chinese then
-		loc:load_localization_file(WolfHUD.mod_path .. "loc/chinese.json")
-	elseif _G.PD2KR then
-		loc:load_localization_file(WolfHUD.mod_path .. "loc/korean.json")
-	else
-		for _, filename in pairs(file.GetFiles(WolfHUD.mod_path .. "loc/")) do
-			local str = filename:match('^(.*).json$')
-			if str and Idstring(str) and Idstring(str):key() == SystemInfo:language():key() then
-				loc:load_localization_file(WolfHUD.mod_path .. "loc/" .. filename)
+	local loc_path = WolfHUD.mod_path .. "loc/"
+	if file.DirectoryExists( loc_path ) then
+		local chinese = false
+		for k, v in pairs(LuaModManager.Mods) do
+			local info = v.definition
+			if info["name"] == "ChnMod" then
+				chinese = true
 				break
 			end
 		end
-	end
-	loc:load_localization_file(WolfHUD.mod_path .. "loc/english.json", false)
-	
-	if WolfHUD:getSetting("replace_weapon_names", "boolean") then
-		loc:load_localization_file(WolfHUD.mod_path .. "loc/RealWeaponNames.json")
+		if chinese then
+			loc:load_localization_file(loc_path .. "chinese.json")
+		elseif _G.PD2KR then
+			loc:load_localization_file(loc_path .. "korean.json")
+		else
+			for _, filename in pairs(file.GetFiles(loc_path)) do
+				local str = filename:match('^(.*).json$')
+				if str and Idstring(str) and Idstring(str):key() == SystemInfo:language():key() then
+					loc:load_localization_file(WolfHUD.mod_path .. "loc/" .. filename)
+					break
+				end
+			end
+		end
+		loc:load_localization_file(WolfHUD.mod_path .. "loc/english.json", false)
+		
+		if WolfHUD:getSetting("replace_weapon_names", "boolean") then
+			loc:load_localization_file(WolfHUD.mod_path .. "loc/RealWeaponNames.json")
+		end
+	else
+		WolfHUD:print_log("Localization folder seems to be missing!", "error")
 	end
 	
 	if WolfHUD:getSetting("skip_blackscreen", "boolean") then
@@ -814,9 +822,8 @@ Hooks:Add("MenuManagerInitialize", "MenuManagerInitialize_WolfHUD", function(men
 	end
 	
 	MenuCallbackHandler.WolfHUD_TabStats_Focus = function(node, focus)
-		log("TabStats Focus Callback here.")
 		if managers.menu:active_menu().name ~= "menu_main" then
-			if managers.hud then
+			if managers.hud and managers.hud._hud_statsscreen then
 				if focus then
 					managers.hud:show_stats_screen()
 				else
@@ -845,6 +852,12 @@ Hooks:Add("MenuManagerInitialize", "MenuManagerInitialize_WolfHUD", function(men
 		if managers.hud and HUDListManager then managers.hud:change_list_setting(tostring(name), WolfHUD:getSetting(name, "color", WolfHUD:getSetting(name))) end
 	end
 	
+	MenuCallbackHandler.clbk_change_hudlist_buff_setting = function(self, item)
+		self:clbk_change_setting(item)
+		local name = item:parameters().name
+		if managers.hud and HUDListManager then managers.hud:change_bufflist_setting(tostring(name), WolfHUD:getSetting(name, "boolean")) end
+	end
+	
 	MenuCallbackHandler.clbk_change_customhud_setting = function(self, item)
 		self:clbk_change_setting(item)
 		if managers.hud and HUDManager.CUSTOM_TEAMMATE_PANELS and managers.hud.change_hud_setting then 
@@ -868,6 +881,12 @@ Hooks:Add("MenuManagerInitialize", "MenuManagerInitialize_WolfHUD", function(men
 		self:clbk_change_setting(item)
 		local name = item:parameters().name
 		if managers.hud and managers.hud.change_drivinghud_setting then managers.hud:change_drivinghud_setting(tostring(name), WolfHUD:getSetting(name, "color", WolfHUD:getSetting(name))) end
+	end
+	
+	MenuCallbackHandler.clbk_change_vanillahud_setting = function(self, item)
+		self:clbk_change_setting(item)
+		local name = item:parameters().name
+		if managers.hud and managers.hud._change_vanillahud_setting then managers.hud:_change_vanillahud_setting(tostring(name)) end
 	end
 		
 	WolfHUD:Load()

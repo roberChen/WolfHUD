@@ -122,6 +122,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			[130322] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_loud_pause(...) end },	--Train heist vaults
 			[130422] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_loud_pause(...) end },	--Train heist vaults
 			[130522] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_loud_pause(...) end },	--Train heist vaults
+			[145557] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end } -- Safehouse Killhouse Timer
 			--[130320] = { },	--The Diamond outer time lock
 			--[130395] = { },	--The Diamond inner time lock
 			--[101457] = { },	--Big Bank time lock door #1
@@ -150,7 +151,9 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			drk_pku_blow_torch = 				"_special_equipment_interaction_handler",
 			hold_born_receive_item_blow_torch = "_special_equipment_interaction_handler",
 			thermite = 							"_special_equipment_interaction_handler",
-			--gasoline = 							"_special_equipment_interaction_handler",	--Spots to place gas canister
+			gasoline = 							"_special_equipment_interaction_handler",	--Spots to place gas canister
+			c4_consume = 						"_special_equipment_interaction_handler",	-- Spots to place mission c4
+			--c4_bag = 							"_special_equipment_interaction_handler", 	-- Yellow bag, pickup c4
 			gasoline_engine = 					"_special_equipment_interaction_handler",
 			gen_pku_thermite = 					"_special_equipment_interaction_handler",
 			gen_pku_thermite_paste = 			"_special_equipment_interaction_handler",
@@ -168,6 +171,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			firstaid_box =						"_deployable_interaction_handler",
 			ammo_bag =							"_deployable_interaction_handler",
 			doctor_bag =						"_deployable_interaction_handler",
+			first_aid_kit = 					"_deployable_interaction_handler",
 			bodybags_bag =						"_deployable_interaction_handler",
 			grenade_crate =						"_deployable_interaction_handler",
 		},
@@ -176,10 +180,12 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			weapon_case_axis_z =		"weapon",
 			samurai_armor =				"samurai_suit",
 			gen_pku_warhead_box =		"warhead",
+			pku_toothbrush = 			"toothbrush",
 			corpse_dispose =			"person",
 			crate_loot = 				"crate",
 			crate_loot_crowbar = 		"crate",
 			crate_weapon_crowbar = 		"crate",
+			hold_open_xmas_present = 	"xmas_present",
 			hold_open_case =			"drone_control_helmet",	--May be reused in future heists for other loot
 		},
 		BAGGED_IDS = {
@@ -195,6 +201,11 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			--[102913] = 1, [102915] = 1, [102916] = 1,	--Train Heist turret (unit fixed, need workaround)
 			[105025] = 10, [105026] = 9, [104515] = 8, [104518] = 7, [104517] = 6, [104522] = 5, [104521] = 4, [104520] = 3, [104519] = 2, [104523] = 1, --Slaughterhouse alt 1.
 			[105027] = 10, [105028] = 9, [104525] = 8, [104524] = 7, [104490] = 6, [100779] = 5, [100778] = 4, [100777] = 3, [100773] = 2, [100771] = 1, --Slaughterhouse alt 2.
+		},
+		CONDITIONAL_COMPOSITE_LOOT_UNITS = {
+			disassemble_turret = function(unit)
+				return unit:body("body_01") and unit:body("body_01"):enabled() and 3 or unit:body("body_02") and unit:body("body_02"):enabled() and 2 or unit:body("body_03") and unit:body("body_03"):enabled() and 1 or 0
+			end,
 		},
 		CONDITIONAL_IGNORE_IDS = {
 			ff3_vault = function(wall_id)
@@ -279,6 +290,13 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				[102052] = true,
 				[102402] = true,
 			},
+			chill_combat = { -- Ammo shelves
+				[100751] = true,
+				[101242] = true,
+			},
+			short2_stage1 = {	-- Keycard
+				[104102] = true,
+			},
 		},
 	}
 	GameInfoManager._INTERACTIONS.IGNORE_IDS.watchdogs_2_day = table.deep_map_copy(GameInfoManager._INTERACTIONS.IGNORE_IDS.watchdogs_2)
@@ -295,6 +313,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			firstaid_box =						"doc_bag",
 			ammo_bag =							"ammo_bag",
 			doctor_bag =						"doc_bag",
+			first_aid_kit = 					"first_aid_kit",
 			bodybags_bag =						"body_bag",
 			grenade_crate =					"grenade_crate",
 		},
@@ -441,6 +460,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		self._deployables = {
 			ammo_bag = {},
 			doc_bag = {},
+			first_aid_kit = {},
 			body_bag = {},
 			grenade_crate = {},
 		}
@@ -595,7 +615,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		if event == "create" then
 			if not self._timers[key] then	
 				local unit, ext, device_type, can_have_upgrades = ...
-				local id = unit:editor_id()		
+				local id = unit:editor_id()	
 				self._timers[key] = { unit = unit, ext = ext, device_type = device_type, id = id, jammed = false, powered = true, upgradable = false, can_have_upgrades = can_have_upgrades }
 				self:_listener_callback("timer", "create", key, self._timers[key])
 			end
@@ -824,7 +844,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		local type = GameInfoManager._EQUIPMENT.INTERACTION_ID_TO_TYPE[data.interact_id]
 		
 		if self._deployables[type][key] then
- 			local active = event == "add"
+ 			local active = event == "add" or event == "interact"
 			local offset = GameInfoManager._EQUIPMENT.AMOUNT_OFFSETS[data.unit:editor_id()] or GameInfoManager._EQUIPMENT.AMOUNT_OFFSETS[data.interact_id]
 			
 			self:_bag_deployable_event("set_active", key, { active = active }, type)
@@ -839,18 +859,32 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		if event == "add" then
  			if not self._loot[key] then
  				local composite_lookup = GameInfoManager._INTERACTIONS.COMPOSITE_LOOT_UNITS
-				local count = composite_lookup[data.editor_id] or composite_lookup[data.interact_id] or 1
+				local conditional_lookup = GameInfoManager._INTERACTIONS.CONDITIONAL_COMPOSITE_LOOT_UNITS
+				local count_clbk = conditional_lookup[data.editor_id] or conditional_lookup[data.interact_id]
+				local count = count_clbk and count_clbk(data.unit) or composite_lookup[data.editor_id] or composite_lookup[data.interact_id] or 1
 				local bagged = GameInfoManager._INTERACTIONS.BAGGED_IDS[data.interact_id] and true or false
 
 				self._loot[key] = { unit = data.unit, carry_id = data.carry_id, count = count, bagged = bagged }
  				self:_listener_callback("loot", "add", key, self._loot[key])
 				self:_loot_count_event("change", data.carry_id, bagged, count, self._loot[key])
  			end
- 		elseif event == "remove" then
- 			if self._loot[key] then
+ 		elseif self._loot[key] then
+ 			if event == "remove"then
  				self:_listener_callback("loot", "remove", key, self._loot[key])
 				self:_loot_count_event("change", data.carry_id, self._loot[key].bagged, -self._loot[key].count, self._loot[key])
  				self._loot[key] = nil
+			elseif event == "interact" then
+ 				local composite_lookup = GameInfoManager._INTERACTIONS.COMPOSITE_LOOT_UNITS
+				local conditional_lookup = GameInfoManager._INTERACTIONS.CONDITIONAL_COMPOSITE_LOOT_UNITS
+				local count_clbk = conditional_lookup[data.editor_id] or conditional_lookup[data.interact_id]
+				local count = count_clbk and count_clbk(data.unit) or composite_lookup[data.editor_id] or composite_lookup[data.interact_id] or 1
+				local bagged = GameInfoManager._INTERACTIONS.BAGGED_IDS[data.interact_id] and true or false
+				local change = count - self._loot[key].count
+				
+				self._loot[key].count = count
+				self._loot[key].bagged = bagged
+ 				self:_listener_callback("loot", "interact", key, self._loot[key])
+				self:_loot_count_event("change", data.carry_id, bagged, change, self._loot[key])
  			end
  		end
  	end
@@ -918,6 +952,10 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		self:_bag_deployable_event(event, key, data, "doc_bag")
 	end
 	
+	function GameInfoManager:_first_aid_kit_event(event, key, data)
+		self:_bag_deployable_event(event, key, data, "first_aid_kit")
+	end
+	
 	function GameInfoManager:_ammo_bag_event(event, key, data)
 		self:_bag_deployable_event(event, key, data, "ammo_bag")
 	end
@@ -953,7 +991,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			end
 			
 			local aggregate_key = GameInfoManager._EQUIPMENT.AGGREAGATE_ITEMS[self._deployables[type][key].unit:editor_id()]
-			--log(self._deployables[key].type .. " | " .. self._deployables[key].unit:editor_id())
+			WolfHUD:print_log(type .. " | " .. self._deployables[type][key].unit:editor_id(), "info")
 			if event == "destroy" then
 				self:_listener_callback(type, "destroy", key, self._deployables[type][key])
 				self._deployables[type][key] = nil
@@ -1009,6 +1047,9 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				--	self._deployables[type][aggregate_key].owner = owner
 				--	self:_listener_callback(type, "set_owner", aggregate_key, self._deployables[type][aggregate_key])
 				--end
+			elseif event == "set_upgrades" then
+				self._deployables[type][key].upgrades = data.upgrades
+				self:_listener_callback(type, "set_upgrades", key, self._deployables[type][key])
 			elseif event == "set_max_amount" then
 				self._deployables[type][key].max_amount = data.max_amount
 				self:_listener_callback(type, "set_max_amount", key, self._deployables[type][key])
@@ -1825,7 +1866,7 @@ if string.lower(RequiredScript) == "lib/managers/objectinteractionmanager" then
 	local add_unit_original = ObjectInteractionManager.add_unit
 	local remove_unit_original = ObjectInteractionManager.remove_unit
 	local interact_original = ObjectInteractionManager.interact
-	--local interupt_action_interact_original = ObjectInteractionManager.interupt_action_interact
+	local end_action_interact_original = ObjectInteractionManager.end_action_interact
 	
 	function ObjectInteractionManager:init(...)
 		init_original(self, ...)
@@ -1848,21 +1889,26 @@ if string.lower(RequiredScript) == "lib/managers/objectinteractionmanager" then
 	end
 	
 	function ObjectInteractionManager:interact(...)
-		if alive(self._active_unit) and self._active_unit:interaction().tweak_data == "corpse_alarm_pager" then
-			managers.gameinfo:event("pager", "set_answered", tostring(self._active_unit:key()))
+		if alive(self._active_unit) and self._active_unit:interaction() then
+			if self._active_unit:interaction().tweak_data == "corpse_alarm_pager" then
+				managers.gameinfo:event("pager", "set_answered", tostring(self._active_unit:key()))
+			end
 		end
 		
 		return interact_original(self, ...)
 	end
---[[	
-	function ObjectInteractionManager:interupt_action_interact(...)
-		if alive(self._active_unit) and self._active_unit:interaction() and self._active_unit:interaction().tweak_data == "corpse_alarm_pager" then
-			managers.gameinfo:event("pager", "remove", tostring(self._active_unit:key()))
+	
+	function ObjectInteractionManager:end_action_interact(...)
+		local value = end_action_interact_original(self, ...)
+		
+		if alive(self._active_unit) and self._active_unit:interaction() then
+			local id = self._active_unit:interaction().tweak_data
+			local editor_id = self._active_unit:editor_id()
+			managers.gameinfo:event("interactive_unit", "interact", tostring(self._active_unit:key()), { unit = self._active_unit, editor_id = editor_id, interact_id = id })
 		end
 		
-		return interupt_action_interact_original(self, ...)
+		return value
 	end
-]]
 	
 	function ObjectInteractionManager:add_unit_clbk(unit)
 		self._queued_units[tostring(unit:key())] = unit
@@ -2022,10 +2068,11 @@ if string.lower(RequiredScript) == "lib/units/equipment/ecm_jammer/ecmjammerbase
  	end
 	
 	function ECMJammerBase:destroy(...)
+		local key = tostring(self._unit:key())
+		managers.gameinfo:event("ecm", "set_feedback_active", key, { feedback_active = false })
+		managers.gameinfo:event("ecm", "destroy", key)
 		destroy_original(self, ...)
-		managers.gameinfo:event("ecm", "set_retrigger_active", tostring(self._unit:key()), { retrigger_active = false })
-		managers.gameinfo:event("ecm", "set_feedback_active", tostring(self._unit:key()), { feedback_active = false })
-		managers.gameinfo:event("ecm", "destroy", tostring(self._unit:key()))
+		managers.gameinfo:event("ecm", "set_retrigger_active", key, { retrigger_active = false })
 	end
 	
 end
@@ -2036,6 +2083,7 @@ if string.lower(RequiredScript) == "lib/units/equipment/doctor_bag/doctorbagbase
 	local init_original = DoctorBagBase.init
 	local sync_setup_original = DoctorBagBase.sync_setup
 	local _set_visual_stage_original = DoctorBagBase._set_visual_stage
+	local _get_upgrade_levels_original = DoctorBagBase._get_upgrade_levels
 	local destroy_original = DoctorBagBase.destroy
 	
 	function DoctorBagBase.spawn(pos, rot, amount_upgrade_lvl, peer_id, ...)
@@ -2065,8 +2113,57 @@ if string.lower(RequiredScript) == "lib/units/equipment/doctor_bag/doctorbagbase
 		return _set_visual_stage_original(self, ...)
 	end
 	
+	function DoctorBagBase:_get_upgrade_levels(...)
+		local upgrade_values = { _get_upgrade_levels_original(self, ...) }
+		managers.gameinfo:event("doc_bag", "set_upgrades", tostring(self._unit:key()), { upgrades = { damage_reduction = upgrade_values[2] } })
+		return unpack(upgrade_values)
+	end
+	
 	function DoctorBagBase:destroy(...)
 		managers.gameinfo:event("doc_bag", "destroy", tostring(self._unit:key()))
+		return destroy_original(self, ...)
+	end
+	
+end
+
+if string.lower(RequiredScript) == "lib/units/equipment/first_aid_kit/firstaidkitbase" then
+	
+	local spawn_original = FirstAidKitBase.spawn
+	local init_original = FirstAidKitBase.init
+	local sync_setup_original = FirstAidKitBase.sync_setup
+	local _get_upgrade_levels_original = FirstAidKitBase._get_upgrade_levels
+	local destroy_original = FirstAidKitBase.destroy
+	
+	function FirstAidKitBase.spawn(pos, rot, bits, peer_id, ...)
+		local unit = spawn_original(pos, rot, bits, peer_id, ...)
+		if alive(unit) then
+			local key = tostring(unit:key())
+			managers.gameinfo:event("first_aid_kit", "create", key, { unit = unit })
+			managers.gameinfo:event("first_aid_kit", "set_owner", key, { owner = peer_id })
+		end
+		return unit
+	end
+	
+	function FirstAidKitBase:init(unit, ...)
+		local key = tostring(unit:key())
+		managers.gameinfo:event("first_aid_kit", "create", key, { unit = unit })
+		init_original(self, unit, ...)
+		managers.gameinfo:event("first_aid_kit", "set_max_amount", key, { max_amount = 1 })
+	end
+	
+	function FirstAidKitBase:sync_setup(bits, peer_id, ...)
+		managers.gameinfo:event("first_aid_kit", "set_owner", tostring(self._unit:key()), { owner = peer_id })
+		return sync_setup_original(self, bits, peer_id, ...)
+	end
+	
+	function FirstAidKitBase:_get_upgrade_levels(...)
+		local upgrade_values = { _get_upgrade_levels_original(self, ...) }
+		managers.gameinfo:event("first_aid_kit", "set_upgrades", tostring(self._unit:key()), { upgrades = { damage_reduction = upgrade_values[1], auto_recovery = upgrade_values[2] } })
+		return unpack(upgrade_values)
+	end
+	
+	function FirstAidKitBase:destroy(...)
+		managers.gameinfo:event("first_aid_kit", "destroy", tostring(self._unit:key()))
 		return destroy_original(self, ...)
 	end
 	
@@ -2080,12 +2177,13 @@ if string.lower(RequiredScript) == "lib/units/equipment/ammo_bag/ammobagbase" th
 	local _set_visual_stage_original = AmmoBagBase._set_visual_stage
 	local destroy_original = AmmoBagBase.destroy
 	
-	function AmmoBagBase.spawn(pos, rot, ammo_upgrade_lvl, peer_id, ...)
-		local unit = spawn_original(pos, rot, ammo_upgrade_lvl, peer_id, ...)
+	function AmmoBagBase.spawn(pos, rot, ammo_upgrade_lvl, peer_id, bullet_storm_level, ...)
+		local unit = spawn_original(pos, rot, ammo_upgrade_lvl, peer_id, bullet_storm_level, ...)
 		if alive(unit) then
 			local key = tostring(unit:key())
 			managers.gameinfo:event("ammo_bag", "create", key, { unit = unit })
 			managers.gameinfo:event("ammo_bag", "set_owner", key, { owner = peer_id })
+			managers.gameinfo:event("ammo_bag", "set_upgrades", key, { upgrades = { bullet_storm = bullet_storm_level } })
 		end
 		return unit
 	end
@@ -2097,9 +2195,11 @@ if string.lower(RequiredScript) == "lib/units/equipment/ammo_bag/ammobagbase" th
 		managers.gameinfo:event("ammo_bag", "set_max_amount", key, { max_amount = self._max_ammo_amount })
 	end
 	
-	function AmmoBagBase:sync_setup(ammo_upgrade_lvl, peer_id, ...)
-		managers.gameinfo:event("ammo_bag", "set_owner", tostring(self._unit:key()), { owner = peer_id })
-		return sync_setup_original(self, ammo_upgrade_lvl, peer_id, ...)
+	function AmmoBagBase:sync_setup(ammo_upgrade_lvl, peer_id, bullet_storm_level, ...)
+		local key = tostring(self._unit:key())
+		managers.gameinfo:event("ammo_bag", "set_owner", key, { owner = peer_id })
+		managers.gameinfo:event("ammo_bag", "set_upgrades", key, { upgrades = { bullet_storm_level = bullet_storm_level } })
+		return sync_setup_original(self, ammo_upgrade_lvl, peer_id, bullet_storm_level, ...)
 	end
 	
 	function AmmoBagBase:_set_visual_stage(...)
@@ -2785,6 +2885,7 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 	local _interupt_action_reload_original = PlayerStandard._interupt_action_reload
 	local _start_action_charging_weapon_original = PlayerStandard._start_action_charging_weapon
 	local _end_action_charging_weapon_original = PlayerStandard._end_action_charging_weapon
+	local _update_equip_weapon_timers_original = PlayerStandard._update_equip_weapon_timers
 	
 	function PlayerStandard:_do_action_intimidate(t, interact_type, ...)
 		if interact_type == "cmd_gogo" or interact_type == "cmd_get_up" then
@@ -2846,29 +2947,45 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 				managers.gameinfo:event("buff", "deactivate", "die_hard")
 			end
 			
-			managers.gameinfo:event("player_action", "set_data", "interact", { completed = complete and true or false })
 			managers.gameinfo:event("player_action", "deactivate", "interact")
 		end
 		
-		return _interupt_action_interact_original(self, t, input, complete, ...)
+		local previous_weapon_exire_t = self._equip_weapon_expire_t
+		local value = _interupt_action_interact_original(self, t, input, complete, ...)
+		
+		if self._equip_weapon_expire_t and not previous_weapon_exire_t then
+			local t = managers.player:player_timer():time()
+			local duration = self._equip_weapon_expire_t - t
+			managers.gameinfo:event("player_action", "activate", "interact_debuff", { t = t, duration = duration })
+		end
+		
+		return value
 	end
 	
-	function PlayerStandard._start_action_use_item(self, t, ...)
+	function PlayerStandard:_start_action_use_item(t, ...)
 		local equipment_id = managers.player:selected_equipment_id()
 		local timer = managers.player:selected_equipment_deploy_timer()
-		managers.gameinfo:event("player_action", "activate", "place_equipment", { t = t, duration = timer })
-		managers.gameinfo:event("player_action", "set_data", "place_equipment", { interact_id = equipment_id })
+		managers.gameinfo:event("player_action", "activate", "interact", { t = t, duration = timer })
+		managers.gameinfo:event("player_action", "set_data", "interact", { interact_id = equipment_id })
 		
 		return _start_action_use_item_original(self, t, ...)
 	end
 	
-	function PlayerStandard._interupt_action_use_item(self, t, input, complete, ...)
+	function PlayerStandard:_interupt_action_use_item(t, input, complete, ...)
 		if self._use_item_expire_t then
-			managers.gameinfo:event("player_action", "set_data", "place_equipment", { completed = complete and true or false })
-			managers.gameinfo:event("player_action", "deactivate", "place_equipment")
+			managers.gameinfo:event("player_action", "deactivate", "interact")
 		end
 		
-		return _interupt_action_use_item_original(self, t, input, complete, ...)
+		local previous_weapon_exire_t = self._equip_weapon_expire_t
+		local value = _interupt_action_use_item_original(self, t, input, complete, ...)
+		
+		if self._equip_weapon_expire_t and not previous_weapon_exire_t then
+			local t = managers.player:player_timer():time()
+			local duration = self._equip_weapon_expire_t - t
+			managers.gameinfo:event("player_action", "activate", "interact_debuff", { t = t, duration = duration })
+		end
+		
+		return value
 	end
 	
 	function PlayerStandard:_start_action_reload(t, ...)
@@ -2907,6 +3024,16 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 			managers.gameinfo:event("player_action", "deactivate", "weapon_charge")
 		end
 		return _end_action_charging_weapon_original(self, ...)
+	end
+	
+	function PlayerStandard:_update_equip_weapon_timers(...)
+		local value = _update_equip_weapon_timers_original(self, ...)
+		
+		if not self._equip_weapon_expire_t then
+			managers.gameinfo:event("player_action", "deactivate", "interact_debuff")
+		end
+		
+		return value
 	end
 	
 	--OVERRIDE

@@ -77,6 +77,7 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudstatsscreen" then
 		{ name = "shields_killed", 		text_id = "wolfhud_tabstats_shields_killed", 	color = Color.yellow,				update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"shield", "count"}		}, 	},
 		{ name = "snipers_killed", 		text_id = "wolfhud_tabstats_snipers_killed", 	color = Color(1, 0.67, 0.84, 0.90),	update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"sniper", "count"}		}, 	},
 		{ name = "tasers_killed", 		text_id = "wolfhud_tabstats_tasers_killed", 	color = Color(1, 0, 0.55, 0.55), 	update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"taser", "count"}			}, 	},
+		{ name = "medic_killed", 		text_id = "wolfhud_tabstats_medic_killed", 		color = Color(1, 1, 0.55, 0.24),	update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"medic", "count"}			}, 	},
 		{ name = "gensec_killed", 		text_id = "wolfhud_tabstats_gensec_killed", 	color = Color(1, 0.75, 1, 0.24),	update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"gensec", "count"}		}, 	},
 		{ name = "melee_killed", 		text_id = "wolfhud_tabstats_melee_kills", 		color = Color(1, 0.54, 0.02, 0.02),	update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"total", "melee"}			}, 	},
 		{ name = "explosion_killed", 	text_id = "wolfhud_tabstats_explosion_kills", 	color = Color(1, 1, 0.5, 0),		update = {func = "session_enemy_killed_by_type", 	func_alltime = "enemy_killed_by_type", 	params = {"total", "explosion"}		}, 	},
@@ -401,6 +402,7 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudstatsscreen" then
 			y = killed_text:bottom()
 		end
 		
+		day_wrapper_panel:set_h(y)
 		self:update(day_wrapper_panel)
 	end
 	
@@ -495,12 +497,17 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudstatsscreen" then
 	end
 
 	function HUDStatsScreen:_update_stats_screen_day(right_panel)
+		local dwp = right_panel:child("day_wrapper_panel")
+		local h = dwp and dwp:h()
 		update_stats_screen_day_original(self, right_panel)
 		
 		if not self._use_tab_stats then return end
 		
-		self:clean_up(right_panel)		
-		self:update(right_panel:child("day_wrapper_panel"))
+		self:clean_up(right_panel)
+		if dwp then
+			dwp:set_h(h)
+			self:update(dwp)
+		end
 	end
 	
 	function HUDStatsScreen:update_setting(setting, value)
@@ -614,6 +621,13 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudstatsscreen" then
 		--Hooks:RemovePostHook( "WolfHUD_LPI_Compatability" )
 	end )
 	
+	Hooks:PostHook( HUDStatsScreen, "_create_stats_ext_inventory", "WolfHUD_LPI_Compatability", function(self, ext_inv_panel)
+		local ext_inv_title = ext_inv_panel and ext_inv_panel:child("title")
+		if ext_inv_title then
+			ext_inv_title:hide()
+		end
+	end)
+	
 	function HUDStatsScreen:_update_stats_screen_loot(loot_wrapper_panel)
 		update_stats_screen_loot_original(self, loot_wrapper_panel)
 		if not WolfHUD:getSetting("numberic_loot", "boolean") then return end
@@ -715,6 +729,7 @@ elseif string.lower(RequiredScript) == "lib/managers/statisticsmanager" then
 					+ self:session_enemy_killed_by_type("spooc", "count") 
 					+ self:session_enemy_killed_by_type("tank", "count") 
 					+ self:session_enemy_killed_by_type("taser", "count")
+					+ self:session_enemy_killed_by_type("medic", "count")
 	end
 	
 	--New Functions
@@ -741,6 +756,7 @@ elseif string.lower(RequiredScript) == "lib/managers/statisticsmanager" then
 					+ self:enemy_killed_by_type("spooc", "count") 
 					+ self:enemy_killed_by_type("tank", "count") 
 					+ self:enemy_killed_by_type("taser", "count")
+					+ self:enemy_killed_by_type("medic", "count")
 	end
 	
 	function StatisticsManager:total_downed_alltime()

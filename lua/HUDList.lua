@@ -1,6 +1,3 @@
---TODO:
---	Add Drill Upgrade Icons
-
 if WolfHUD and not WolfHUD:getSetting("use_hudlist", "boolean") then return end
 printf = function(...) 
 	WolfHUD:print_log(string.format(...), "info")
@@ -50,6 +47,16 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			HUDListManager.ListOptions[setting] = value
 			return true
 		end
+	end
+	
+	function HUDManager:change_bufflist_setting(name, show)
+		local suffixes = { "_buff", "_debuff", "_teambuff", "_compbuff" }
+		local buff_id = name
+		for i, suffix in ipairs(suffixes) do
+			buff_id = buff_id:gsub(suffix, "")
+		end
+		
+		--TODO: enable/disable buff
 	end
 	
 	function HUDManager:show_stats_screen(...)
@@ -156,7 +163,9 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		taser = 					{ type_id = "taser",		category = "enemies",	long_name = "wolfhud_enemy_taser" 					},
 		shield = 					{ type_id = "shield",		category = "enemies",	long_name = "wolfhud_enemy_shield" 					},
 		sniper = 					{ type_id = "sniper",		category = "enemies",	long_name = "wolfhud_enemy_sniper" 					},
+		medic = 					{ type_id = "medic",		category = "enemies",	long_name = "wolfhud_enemy_medic" 					},
 		mobster_boss = 				{ type_id = "thug_boss",	category = "enemies",	long_name = "wolfhud_enemy_mobster_boss" 			},
+		chavez_boss = 				{ type_id = "thug_boss",	category = "enemies",	long_name = "wolfhud_enemy_chavez_boss" 			},
 		biker_boss = 				{ type_id = "thug_boss",	category = "enemies",	long_name = "wolfhud_enemy_biker_boss" 				},
 		hector_boss = 				{ type_id = "thug_boss",	category = "enemies",	long_name = "wolfhud_enemy_hector_boss" 			},
 		hector_boss_no_armor = 		{ type_id = "thug_boss",	category = "enemies",	long_name = "wolfhud_enemy_hector_boss_no_armor" 	},
@@ -196,13 +205,13 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		drk_pku_blow_torch = 				"blowtorch",
 		hold_born_receive_item_blow_torch = "blowtorch",
 		thermite = 							"thermite",
-		gasoline = 							"thermite",
 		gasoline_engine = 					"thermite",
 		gen_pku_thermite = 					"thermite",
 		gen_pku_thermite_paste = 			"thermite",
 		gen_int_thermite_rig = 				"thermite",
 		hold_take_gas_can = 				"thermite",
 		gen_pku_thermite_paste_z_axis = 	"thermite",
+		c4_bag = 							"c4",
 		money_wrap_single_bundle = 			"small_loot",
 		money_wrap_single_bundle_active = 	"small_loot",
 		money_wrap_single_bundle_dyn = 		"small_loot",
@@ -260,10 +269,12 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		weapon =					"weapon",
 		weapon_glock =				"weapon",
 		weapon_scar =				"weapon",
+		toothbrush = 				"toothbrush",
 	}
 	
 	HUDListManager.POTENTIAL_LOOT_TYPES = {
 		crate = 					"crate",
+		xmas_present = 				"xmas_present",
 	}
 	
 	HUDListManager.LOOT_TYPES_CONDITIONS = {
@@ -361,7 +372,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		melee_charge = { "melee_charge" },
 		reload = {"reload" }, 
 		interact = { "interact"},
-		place_equipment = { "place_equipment" },
+		interact_debuff = { "interact_debuff" },
 		
 		--Debuffs that are merged into the buff itself
 		composite_debuffs = {
@@ -369,6 +380,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			grinder_debuff = "grinder",
 			unseen_strike_debuff = "unseen_strike",
 			uppers_debuff = "uppers",
+			interact_debuff = "interact",
 		},
 	}
 	
@@ -1400,6 +1412,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 				"activate", 
 				"deactivate", 
 				"set_duration",
+				"set_data",
 				clbk = callback(self, self, "_player_action_event"),
 			},
 		}
@@ -2142,6 +2155,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		taser =			{ atlas = {3, 5}, 	color = HUDListManager.ListOptions.special_color, 	priority = 6 },
 		shield =		{ texture = "guis/textures/pd2/hud_buff_shield", color = HUDListManager.ListOptions.special_color, priority = 6 },
 		sniper =		{ atlas = {6, 5}, 	color = HUDListManager.ListOptions.special_color, 	priority = 6 },
+		medic = 		{ atlas = {5, 8}, 	color = HUDListManager.ListOptions.special_color, 	priority = 6 },
 		thug_boss =		{ atlas = {1, 1}, 	color = HUDListManager.ListOptions.thug_color, 		priority = 4 },
 		phalanx =		{ texture = "guis/textures/pd2/hud_buff_shield", color = HUDListManager.ListOptions.special_color, priority = 7 },
 		
@@ -2453,6 +2467,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		meth_ingredients =			{ waypoints  = { 192, 32, 32, 32 }, priority = 2 },
 		blowtorch = 				{ hudpickups = { 96, 192, 32, 32 }, priority = 1 },
 		thermite = 					{ hudpickups = { 64, 64, 32, 32 }, 	priority = 1 },
+		c4 = 						{ hudicons	 = { 36, 242, 32, 32 }, priority = 1 },
 		secret_item =				{ waypoints  = { 96, 64, 32, 32 }, 	priority = 4 },
 	}
 	
@@ -2501,31 +2516,33 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		
 		armor =			{ text = "wolfhud_hudlist_loot_armor", 		priority = 1 }, 
 		artifact =		{ text = "hud_carry_artifact", 				priority = 1 },
-		bike = 			{ text = "hud_carry_bike_part", 			priority = 1 },
-		bomb =			{ text = "wolfhud_hudlist_loot_bomb", 		priority = 1 },	
+		bike = 			{ text = "hud_carry_bike_part", 			priority = 1 },	-- Biker Heist
+		bomb =			{ text = "wolfhud_hudlist_loot_bomb", 		priority = 1 },	-- Bomb Forest & Dockyard, Murky Station EMP
 		coke =			{ text = "hud_carry_coke", 					priority = 1 },
-		dentist =		{ text = "???", no_localize = true, 		priority = 1 },
-		diamond =		{ text = "wolfhud_hudlist_loot_diamond", 	priority = 1 },
-		drone_ctrl = 	{ text = "hud_carry_helmet", 				priority = 1 },
-		evidence =		{ text = "wolfhud_hudlist_loot_evidence", 	priority = 1 },
-		goat =			{ text = "hud_carry_goat", 					priority = 1 },
+		dentist =		{ text = "???", no_localize = true, 		priority = 1 },	-- Golden Grin
+		diamond =		{ text = "wolfhud_hudlist_loot_diamond", 	priority = 1 },	-- The Diamond
+		drone_ctrl = 	{ text = "hud_carry_helmet", 				priority = 1 },	-- Biker Heist
+		evidence =		{ text = "wolfhud_hudlist_loot_evidence", 	priority = 1 },	-- Hoxton revenge
+		goat =			{ text = "hud_carry_goat", 					priority = 1 },	-- Goat Simulator
 		gold =			{ text = "hud_carry_gold", 					priority = 1 },
 		jewelry =		{ text = "hud_carry_diamonds", 				priority = 1 },
 		meth =			{ text = "hud_carry_meth", 					priority = 1 },
 		money =			{ text = "hud_carry_money", 				priority = 1 },
 		painting =		{ text = "hud_carry_painting", 				priority = 1 },
-		pig =			{ text = "hud_carry_pig", 					priority = 1 },
-		present =		{ text = "hud_carry_present", 				priority = 1 },
+		pig =			{ text = "hud_carry_pig", 					priority = 1 },	-- Slaugtherhouse
+		present =		{ text = "hud_carry_present", 				priority = 1 },	-- Santa's Workshop
 		prototype =		{ text = "hud_carry_prototype", 			priority = 1 },
-		safe =			{ text = "hud_carry_safe", 					priority = 1 },
+		safe =			{ text = "hud_carry_safe", 					priority = 1 },	-- Aftershock
 		server =		{ text = "hud_carry_circuit", 				priority = 1 },
-		shell =			{ text = "hud_carry_ammo", 					priority = 1 },
-		toast =			{ text = "wolfhud_hudlist_loot_toast", 		priority = 1 },
-		turret =		{ text = "hud_carry_turret", 				priority = 1 },
-		warhead =		{ text = "hud_carry_warhead", 				priority = 1 },
+		shell =			{ text = "hud_carry_ammo", 					priority = 1 },	-- Transport: Train
+		toast =			{ text = "wolfhud_hudlist_loot_toast", 		priority = 1 },	-- White Xmas
+		turret =		{ text = "hud_carry_turret", 				priority = 1 },	-- Transport: Train
+		warhead =		{ text = "hud_carry_warhead", 				priority = 1 },	-- Meltdown
 		weapon =		{ text = "wolfhud_hudlist_loot_weapon", 	priority = 1 },
-		body = 			{ text = "hud_carry_person", 				priority = 1 },
-		crate = 		{ text = "wolfhud_hudlist_loot_crate", 		priority = 2, no_separate = true }
+		toothbrush = 	{ text = "wolfhud_hudlist_loot_toothbrush", priority = 1 },	-- Panic Room
+		body = 			{ text = "hud_carry_person", 				priority = 1 },	-- Boiling point
+		crate = 		{ text = "wolfhud_hudlist_loot_crate", 		priority = 2, no_separate = true },
+		xmas_present = 	{ text = "hud_carry_present", 				priority = 2, no_separate = true },	-- White Xmas
 	}
 	function HUDList.LootItem:init(parent, name, id, members)
 		local loot_data = HUDList.LootItem.MAP[id]
@@ -3242,7 +3259,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		self._health_bar:set_bottom(self._panel:bottom())
 		
 		self._hit_indicator = self._panel:bitmap({
-			name = "radial_health",
+			name = "hit_indicator",
 			texture = "guis/textures/pd2/hud_radial_rim",
 			blend_mode = "add",
 			layer = 1,
@@ -3267,7 +3284,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		self._outline:set_center(self._health_bar:center())
 		
 		self._damage_upgrade_text = self._panel:text({
-			name = "type",
+			name = "dmg_upgrade",
 			text = utf8.char(57364),
 			align = "center",
 			vertical = "center",
@@ -3947,6 +3964,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		sixth_sense = {
 			atlas_new = tweak_data.skilltree.skills.chameleon.icon_xy,
 			class = "TimedBuffItem",
+			priority = 4,
 			color = HUDList.BuffItemBase.ICON_COLOR.STANDARD,
 			ignore = not WolfHUD:getSetting("sixth_sense_buff", "boolean"),
 		},
@@ -3981,6 +3999,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		unseen_strike = {
 			atlas_new = tweak_data.skilltree.skills.unseen_strike.icon_xy,
 			class = "TimedBuffItem",
+			priority = 4,
 			color = HUDList.BuffItemBase.ICON_COLOR.STANDARD,
 			ignore = not WolfHUD:getSetting("unseen_strike_buff", "boolean"),
 		},
@@ -4210,18 +4229,19 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		interact = {
 			--atlas_new = tweak_data.skilltree.skills.second_chances.icon_xy,
 			texture = "guis/textures/pd2/skilltree/drillgui_icon_faster",
-			class = "TimedBuffItem",
+			class = "TimedInteractionItem",
 			priority = 10,
 			color = HUDList.BuffItemBase.ICON_COLOR.STANDARD,
 			ignore = (WolfHUD:getSetting("SHOW_CIRCLE", "boolean") or WolfHUD:getSetting("SHOW_TIME_REMAINING", "boolean"))
 		},
-		place_equipment = {
+		interact_debuff = {
+			--atlas_new = tweak_data.skilltree.skills.second_chances.icon_xy,
 			texture = "guis/textures/pd2/skilltree/drillgui_icon_faster",
-			class = "TimedBuffItem",
+			class = "TimedInteractionItem",
 			priority = 10,
-			color = HUDList.BuffItemBase.ICON_COLOR.STANDARD,
-			ignore = (WolfHUD:getSetting("SHOW_CIRCLE", "boolean") or WolfHUD:getSetting("SHOW_TIME_REMAINING", "boolean"))
-		},
+			color = HUDList.BuffItemBase.ICON_COLOR.DEBUFF,
+			ignore = true	--Composite debuff
+		}
 	}
 	
 	function HUDList.BuffItemBase:init(parent, name, icon, w, h)
@@ -4460,6 +4480,10 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		end
 	end
 	
+	function HUDList.BuffItemBase:set_data(id, data)
+		-- Unused, only called for interact Item...
+	end
+	
 	function HUDList.BuffItemBase:_update_debuff(t, dt)
 		self:_set_progress_debuff((t - self._debuff_start_t) / (self._debuff_expire_t - self._debuff_start_t))
 		
@@ -4528,7 +4552,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			end
 		end
 		
-		if self._buff_active and self._expire_t and self._expire_t > t then
+		if self._buff_active and self._expire_t then
 			self:_set_progress((t - self._start_t) / (self._expire_t - self._start_t))
 			
 			if t > self._expire_t then
@@ -4537,7 +4561,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 				self._progress_bar:panel():set_visible(false)
 			end
 			
-			if self._expire_t then
+			if self._expire_t and self._expire_t > t then
 				table.insert(time_str, { 
 					str = string.format("%.1fs", self._expire_t - t), 
 					color = self._default_icon_color
@@ -4893,6 +4917,62 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		self:_set_text(string.format("-%.0f%%", (1-value)*100))
 	end
 	
+	HUDList.TimedInteractionItem = HUDList.TimedInteractionItem or class(HUDList.TimedBuffItem)
+	HUDList.TimedInteractionItem.INTERACT_ID_TO_ICON = {
+		default 					= { texture = "guis/textures/pd2/skilltree/drillgui_icon_faster" 														},
+		ammo_bag 					= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 1*64, 0, 64, 64 } 	},
+		doc_bag 					= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 2*64, 7*64, 64, 64 } 	},
+		first_aid_kit 				= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 3*64, 10*64, 64, 64 } },
+		body_bag 					= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 5*64, 11*64, 64, 64 } },
+		grenade_crate 				= { texture = "guis/dlcs/big_bank/textures/pd2/pre_planning/preplan_icon_types", texture_rect = { 1*48, 0, 48, 48 } 	},
+		ecm_jammer 					= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 1*64, 4*64, 64, 64 } 	},
+		corpse_alarm_pager			= { texture = "guis/textures/pd2/specialization/icons_atlas", 					 texture_rect = { 1*64, 4*64, 64, 64 }	},
+		pick_lock_easy_no_skill 	= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 5*64, 4*64, 64, 64 } 	},
+		intimidate					= "equipment_cable_ties",
+		c4_consume 					= "equipment_c4",
+		drill 						= "pd2_drill",
+		hack 						= "pd2_computer",
+		saw 						= "wp_saw",
+		timer 						= "pd2_computer",
+		securitylock 				= "pd2_computer",
+		digital 					= "pd2_computer",
+	}
+	function HUDList.TimedInteractionItem:init(...)
+		HUDList.TimedInteractionItem.super.init(self, ...)
+	end
+	
+	function HUDList.TimedInteractionItem:activate_debuff()
+		if not self._debuff_active then
+			HUDList.TimedInteractionItem.super.activate_debuff(self)
+			self:_set_icon("default")
+		end
+	end
+	
+	function HUDList.TimedInteractionItem:set_data(id, data)
+		HUDList.TimedInteractionItem.super.set_data(self, id, data)
+		if data.data then
+			self:_set_icon(data.data.interact_id)
+		end
+	end
+	
+	function HUDList.TimedInteractionItem:_set_icon(interact_id)
+		--log(interact_id)
+		local lookup = HUDList.TimedInteractionItem.INTERACT_ID_TO_ICON
+		local icon_data = lookup[interact_id] or lookup["default"]
+		if icon_data and alive(self._icon) then
+			local texture, texture_rect
+			if type(icon_data) == "string" then
+				texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon_data)
+			else
+				texture, texture_rect = icon_data.texture, icon_data.texture_rect
+			end
+			
+			self._icon:set_image(texture)
+			if icon_data.texture_rect then
+				self._icon:set_texture_rect(unpack(texture_rect))
+			end
+		end
+	end
 	
 	PanelFrame = PanelFrame or class()
 	

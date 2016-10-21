@@ -340,128 +340,6 @@ elseif string.lower(RequiredScript) == "lib/managers/menu/renderers/menunodeskil
 			end
 		end
 	end
-elseif RequiredScript == "lib/managers/missionassetsmanager" then
-	function MissionAssetsManager:mission_has_preplanning()
-		if not self._has_locked_asset then
-			for _, asset in ipairs(self._global.assets) do
-				if self:asset_is_buyable(asset) then
-					self._has_locked_asset = true
-					break
-				end
-			end
-		end
-		return tweak_data.preplanning.locations[Global.game_settings and Global.game_settings.level_id] ~= nil and not self._has_locked_asset
-	end
-
-	function MissionAssetsManager:asset_is_buyable(asset)
-		return asset.id ~= "buy_all_assets" and asset.show and not asset.unlocked and ((Network:is_server() and asset.can_unlock) or (Network:is_client() and self:get_asset_can_unlock_by_id(asset.id)))
-	end
-
-	local MissionAssetsManager__setup_mission_assets_orig = MissionAssetsManager._setup_mission_assets
-	function MissionAssetsManager._setup_mission_assets(self, ...)
-		MissionAssetsManager__setup_mission_assets_orig(self, ...)
-		if not self:mission_has_preplanning() then
-			self:insert_buy_all_assets_asset()
-			self:check_all_assets()
-		end
-	end
-
-	function MissionAssetsManager.update_buy_all_assets_asset_cost(self)
-		if not self:mission_has_preplanning() and self._tweak_data.buy_all_assets then
-			self._tweak_data.buy_all_assets.money_lock = 0
-			for _, asset in ipairs(self._global.assets) do
-				if self:asset_is_buyable(asset) then
-					self._tweak_data.buy_all_assets.money_lock = self._tweak_data.buy_all_assets.money_lock + (self._tweak_data[asset.id].money_lock or 0)
-				end
-			end
-		end
-	end
-
-	function MissionAssetsManager.insert_buy_all_assets_asset(self)
-		if not self._tweak_data.gage_assignment then
-			return
-		end
-
-		self._tweak_data.buy_all_assets = clone(self._tweak_data.gage_assignment)
-		self._tweak_data.buy_all_assets.name_id = "wolfhud_buy_all_assets"
-		self._tweak_data.buy_all_assets.unlock_desc_id = "wolfhud_buy_all_assets_desc"
-		self._tweak_data.buy_all_assets.visible_if_locked = true
-		self._tweak_data.buy_all_assets.no_mystery = true
-		self:update_buy_all_assets_asset_cost()
-		for _, asset in ipairs(self._global.assets) do
-			if asset.id == "gage_assignment" then
-				self._gage_saved = deep_clone(asset)
-				asset.id = "buy_all_assets"
-				asset.unlocked = false
-				asset.can_unlock = true
-				asset.no_mystery = true
-				break
-			end
-		end
-		self:check_all_assets()
-	end
-
-	function MissionAssetsManager.check_all_assets(self)
-		if game_state_machine then
-			for _, asset in ipairs(self._global.assets) do
-				if self:asset_is_buyable(asset) then
-					return
-				end
-			end
-			if not self._all_assets_bought then
-				self._tweak_data.buy_all_assets.money_lock = 0
-				self._all_assets_bought = true
-				MissionAssetsManager_unlock_asset_orig(self, "buy_all_assets")
-			end
-		end
-	end
-	local MissionAssetsManager_sync_unlock_asset_orig = MissionAssetsManager.sync_unlock_asset
-	function MissionAssetsManager.sync_unlock_asset(self, ...)
-		MissionAssetsManager_sync_unlock_asset_orig(self, ...)
-		if not self:mission_has_preplanning() then
-			self:update_buy_all_assets_asset_cost()
-			self:check_all_assets()
-		end
-	end
-
-	if not MissionAssetsManager_unlock_asset_orig then MissionAssetsManager_unlock_asset_orig = MissionAssetsManager.unlock_asset end
-	function MissionAssetsManager.unlock_asset(self, asset_id)
-		if asset_id ~= "buy_all_assets" or not game_state_machine or not self:is_unlock_asset_allowed() then
-			return MissionAssetsManager_unlock_asset_orig(self, asset_id)
-		end
-		for _, asset in ipairs(self._global.assets) do
-			if self:asset_is_buyable(asset) then
-				MissionAssetsManager_unlock_asset_orig(self, asset.id)
-			end
-		end
-		self:check_all_assets()
-	end
-
-	local MissionAssetsManager_sync_save_orig = MissionAssetsManager.sync_save
-	function MissionAssetsManager.sync_save(self, data)
-		if self:mission_has_preplanning() then
-			return MissionAssetsManager_sync_save_orig(self, data)
-		end
-		local _global = clone(self._global)
-		_global.assets = clone(_global.assets)
-		for id, asset in ipairs(_global.assets) do
-			if asset.id == "buy_all_assets" then
-				_global.assets[id] = self._gage_saved
-				break
-			end
-		end
-		data.MissionAssetsManager = _global
-	end
-
-	local MissionAssetsManager_sync_load_orig = MissionAssetsManager.sync_load
-	function MissionAssetsManager.sync_load(self, data, ...)
-		if not self:mission_has_preplanning() then
-			self._global = data.MissionAssetsManager
-			self:insert_buy_all_assets_asset()
-			self:check_all_assets()
-		end
-		MissionAssetsManager_sync_load_orig(self, data, ...)
-	end
 elseif string.lower(RequiredScript) == "lib/managers/chatmanager" then
 	if not WolfHUD:getSetting("spam_filter", "boolean") then return end
 	ChatManager._SUB_TABLE = {
@@ -489,7 +367,7 @@ elseif string.lower(RequiredScript) == "lib/managers/chatmanager" then
 	}
 	
 	ChatManager._BLOCK_PATTERNS = {
-	  ".-%[NGBTO%].+",
+	  ".-%[NGBT%w+%].+",
 	  --NGBTO info blocker Should work since its mass spam.
 	  "[%d:]+%d:%d%d.-<DIV>.+"
 	  --Blocks anything, that starts with numbers and ':' and then has a divider (Might block other mods, not only Poco...)
@@ -516,8 +394,6 @@ elseif string.lower(RequiredScript) == "lib/managers/menumanagerdialogs" then
 	MenuManager.show_confirm_blackmarket_buy_weapon_slot = expect_yes
 	MenuManager.show_confirm_mission_asset_buy = expect_yes
 	MenuManager.show_confirm_pay_casino_fee = expect_yes
-	MenuManager.show_play_safehouse_question = expect_yes
-	MenuManager.show_leave_safehouse_dialog = expect_yes
 	
 	local show_person_joining_original = MenuManager.show_person_joining
 	local update_person_joining_original = MenuManager.update_person_joining

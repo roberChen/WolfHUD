@@ -67,7 +67,7 @@ if not WolfHUD:getSetting("use_customhud", "boolean") then
 				w = radial_health_panel:w() * 0.37,--53,
 				h = radial_health_panel:h() * 0.37,--53,
 				layer = 2, 
-				visible = WolfHUD:getSetting("PLAYER_SHOWSTAMINA", "boolean")
+				visible = WolfHUD:getSetting("PLAYER_STAMINA", "boolean")
 			})
 			self._stamina_bar:set_color(Color(1, 1, 0, 0))
 			self._stamina_bar:set_center(radial_health_panel:child("radial_health"):center())
@@ -1261,7 +1261,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			local skill_string = ""
 			
 			for sub_tree = 1, 3, 1 do
-				local skills = data[(tree-1) * 3 + sub_tree]
+				local skills = data[(tree-1) * 3 + sub_tree] or 0
 				skill_string = string.format("%s%02d%s", skill_string, tonumber(skills), sub_tree < 3 and "|" or "")
 				if tonumber(skills) > 0 then
 					tree_has_points = true
@@ -1799,7 +1799,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._stored_health = 0
 		self._stored_health_max = 0
 		self._downs = 0
-		self._max_downs = tweak_data.player.damage.LIVES_INIT - 1
+		self._max_downs = (Global.game_settings.difficulty == "sm_wish" and 2 or tweak_data.player.damage.LIVES_INIT) - 1
 		self._reviver_count = 0
 		
 		self._owner:register_listener("PlayerStatus", { "health" }, callback(self, self, "set_health"), false)
@@ -2948,6 +2948,12 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		end
 	end
 	
+	function PlayerInfoComponent.Equipment:set_is_local_player(state)
+		if PlayerInfoComponent.Equipment.super.set_is_local_player(self, state) then
+
+		end
+	end
+	
 	function PlayerInfoComponent.Equipment:set_is_ai(state)
 		if PlayerInfoComponent.Equipment.super.set_is_ai(self, state) and self:set_enabled("ai", not self._is_ai) then
 			self._owner:arrange()
@@ -3062,6 +3068,20 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		end
 		
 		panel:set_visible(text_str:len() > 0)
+		self:arrange()
+	end
+	
+	function PlayerInfoComponent.Equipment:set_bodybag(icon)	-- equipment_body_bag
+		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon)
+		self._panel:child("body_bags"):child("icon"):set_image(texture, unpack(texture_rect))
+	end
+	
+	function PlayerInfoComponent.Equipment:set_bodybag_amount(amount)
+		local panel = self._panel:child("body_bags")
+		local text = panel:child("amount")
+		text:set_text(string.format("%02.0f", amount))
+		text:set_range_color(0, amount < 10 and 1 or 0, Color.white:with_alpha(0.5))
+		panel:set_visible(amount > 0)
 		self:arrange()
 	end
 	
@@ -3770,7 +3790,7 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 			end
 			
 			--Seperate Player Panel setup, so its always the most bottom one
-			local player_pos = math.abs(WolfHUD:getSetting("PLAYER_POSITION", "number", 2))
+			local player_pos = math.clamp(WolfHUD:getSetting("PLAYER_POSITION", "number", 2), 1, 3)
 			local player_w, player_h = player_panel:w() or 0, player_panel:h() or 0
 			player_panel:set_center_x(getW(hud_w, player_w, player_pos))
 			player_panel:set_bottom(hud_h - teammate_offset[player_pos])
@@ -3778,7 +3798,7 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 			teammate_offset[player_pos] = teammate_offset[player_pos] + player_panel:h() + MARGIN
 			
 			local j = 1
-			local teammate_pos = { math.abs(WolfHUD:getSetting("TEAM_POSITION", "number", 1)) }
+			local teammate_pos = { math.clamp(WolfHUD:getSetting("TEAM_POSITION", "number", 1), 1, 3) }
 			table.insert(teammate_pos, (teammate_pos[1] > 1 and 1 or 3))
 			
 			for i, teammate in ipairs(self._teammate_panels) do

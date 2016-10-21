@@ -3,7 +3,7 @@ Waypoint settings:
     unit: 					(unit) 		A game unit to tie the waypoint to. If the unit is deleted from the game, the waypoint will be removed. Preference as follows: unit head position, unit interaction positions, unit position
     position: 				(vector)	A fixed 3D vector position to place the waypoint at
 	offset: 				(vector) 	Offset vector from the Unit/position
-	visible_through_walls:		(boolean)	Option to show/hide Waypoints, if the unit is not visible from the palyers position.
+	visible_through_walls:	(boolean)	Option to show/hide Waypoints, if the unit is not visible from the palyers position.
 	mask					(various)	Slot mask for the visible_through_walls raycast. Can be a default slot_mask name string or a slotmask directly.
 	show_offscreen: 		(boolean) 	Show this waypoint if it's outside your FOV (default: false)
 	radius_offscreen: 		(number) 	Radius of the circle the waypoint is orbiting on while moving (default: 200)
@@ -42,7 +42,6 @@ Component settings:			(table)		Component definition as subtable of the Waypoint 
     fade_duration: 			(table) 	"min"/"max" 	(number)	values to start fade (0-1),
 										"alpha" 		(boolean)	for it to affect the components alpha,
 										"color"			(table)		"start"/"stop"	(color)	Color for the Component on 0/100% progress.
-										"position" 		(vector)	to change the position offset of the whole waypoint
 
 Icon exclusive settings:
     texture: 				(string) 	Path to texture to use for icon
@@ -73,17 +72,34 @@ Last Note: Don't call any functions starting with "_" (or the update-functions) 
 ]]
 if RequiredScript == "lib/setups/setup" then
 	
+	local function format_time_string(value)
+		local frmt_string
+	
+		if math.floor(value) > 60 then
+			frmt_string = string.format("%d:%02d", math.floor(value / 60), math.floor(value % 60))
+		elseif math.floor(value) > 9.9 then
+			frmt_string = string.format("%d", math.floor(value))
+		elseif value > 0 then
+			frmt_string = string.format("%.1f", value)
+		else
+			frmt_string = string.format("%.1f", 0)
+		end
+		
+		return frmt_string
+	end
+	
 	local init_managers_original = Setup.init_managers
 
 	function Setup:init_managers(managers, ...)
-		managers.waypoints = managers.waypoints or WaypointManager:new()
 		init_managers_original(self, managers, ...)
+		managers.waypoints = managers.waypoints or WaypointManager:new()
 	end
 
 
 	WaypointManager = WaypointManager or class()
 	
 	function WaypointManager:init()
+		self._workspace = managers.gui_data and managers.gui_data:create_fullscreen_workspace()
 		self._waypoints = {}
 		self._pending_waypoints = {}
 	end
@@ -98,9 +114,8 @@ if RequiredScript == "lib/setups/setup" then
 	
 	function WaypointManager:update(t, dt)
 		local cam = managers.viewport:get_current_camera()
-		local workspace = managers.hud:get_fullscreen_workspace()
 		
-		if self._hud_panel and cam then
+		if alive(self._hud_panel) and alive(self._workspace) and cam then
 			local cam_forward = Vector3()
 
 			mrotation.y(managers.viewport:get_current_camera_rotation(), cam_forward)
@@ -110,7 +125,7 @@ if RequiredScript == "lib/setups/setup" then
 					wp:_clear()
 					self._waypoints[id] = nil
 				else
-					wp:update(t, dt, cam, cam_forward, self._hud_panel, workspace)
+					wp:update(t, dt, cam, cam_forward, self._hud_panel, self._workspace)
 				end
 				
 			end
@@ -522,7 +537,7 @@ if RequiredScript == "lib/setups/setup" then
 			mvector3.add(world_pos, offset)
 			mvector3.set(screen_pos, workspace:world_to_screen(cam, world_pos))
 			mvector3.set(dir, world_pos)
-			mvector3.subtract(dir, managers.viewport:get_current_camera_position())
+			mvector3.subtract(dir, cam:position())
 			mvector3.set(dir_normalized, dir)
 			mvector3.normalize(dir_normalized)
 			dot = mvector3.dot(cam_fwd, dir_normalized)
@@ -576,8 +591,7 @@ if RequiredScript == "lib/setups/setup" then
 		if self._settings[name] then
 			self._settings[name].value = math.max(value, 0)
 			if self._components[name] and self._settings[name].show then
-				local frmt = value >= 9.95 and "%.0fs" or "%.1fs"
-				self:set_label(name, string.format(frmt, value))
+				self:set_label(name, format_time_string(value))
 			end
 		end
 	end
@@ -586,8 +600,7 @@ if RequiredScript == "lib/setups/setup" then
 		if self._settings[name] then
 			self._settings[name].value = math.max(value, 0)
 			if self._components[name] and self._settings[name].show then
-				local frmt = value >= 9.95 and "%.0fs" or "%.1fs"
-				self:set_label(name, string.format(frmt, value))
+				self:set_label(name, format_time_string(value))
 			end
 		end
 	end
@@ -943,10 +956,6 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 	function HUDManager:update(t, dt, ...)
 		managers.waypoints:update(t, dt)
 		return update_original(self, t, dt, ...)
-	end
-	
-	function HUDManager:get_fullscreen_workspace()
-		return self._fullscreen_workspace
 	end
 
 end

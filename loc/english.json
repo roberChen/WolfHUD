@@ -38,6 +38,7 @@
 	"wolfhud_hudlist_loot_evidence" : "Evidence",
 	"wolfhud_hudlist_loot_toast" : "Toast",
 	"wolfhud_hudlist_loot_crate" : "Crate",
+	"wolfhud_hudlist_loot_toothbrush" : "Brush",
 	
 	"wolfhud_hudlist_buff_basic" : "Basic",
 	"wolfhud_hudlist_buff_aced" : "Aced",
@@ -54,6 +55,7 @@
 	"wolfhud_tabstats_snipers_killed" : "Snipers killed:",
 	"wolfhud_tabstats_tasers_killed" : "Tasers killed:",
 	"wolfhud_tabstats_gensec_killed" : "GENSEC killed:",
+	"wolfhud_tabstats_medic_killed" : "Medics killed:",
 	"wolfhud_tabstats_melee_kills" : "Melee Kills:",
 	"wolfhud_tabstats_explosion_kills" : "Explosion Kills:",
 	"wolfhud_tabstats_nonspecial_kills" : "Non Special Kills:",
@@ -75,6 +77,7 @@
 	"wolfhud_enemy_spook" : "Cloaker",
 	"wolfhud_enemy_taser" : "Taser",
 	"wolfhud_enemy_sniper" : "Sniper",
+	"wolfhud_enemy_medic" : "Medic",
 	"wolfhud_enemy_tank" : "Bulldozer",
 	"wolfhud_enemy_tank_hw" : "Headless Dozer",
 	"wolfhud_enemy_phalanx_minion" : "Winters Shield",
@@ -83,6 +86,7 @@
 	"wolfhud_enemy_ceiling_turret" : "TURRET",
 	"wolfhud_enemy_sentry_gun" : "SENTRY GUN",
 	"wolfhud_enemy_mobster_boss" : "The Comissar",
+	"wolfhud_enemy_chavez_boss" : "Chavez",
 	"wolfhud_enemy_biker_boss" : "Biker Boss",
 	"wolfhud_enemy_bank_manager" : "Bank Manager",
 	"wolfhud_enemy_inside_man" : "Inside Man",
@@ -93,6 +97,7 @@
 	"wolfhud_enemy_old_hoxton_mission" : "Hoxton / Locke",
 	"wolfhud_enemy_hector_boss" : "Armoured Hector",
 	"wolfhud_enemy_hector_boss_no_armor" : "Hector",
+	"wolfhud_enemy_crew" : "Crew Member",
 	
 	
 	"wolfhud_multiselect_all" : "All",
@@ -528,6 +533,8 @@
 	"wolfhud_waypoints_show_ammo_bag_desc" : "Show Waypoints for Ammo bags, telling you the Percentage left.",
 	"wolfhud_waypoints_show_doc_bag_title" : "Show Doctor Bags",
 	"wolfhud_waypoints_show_doc_bag_desc" : "Show Waypoints for Doctor Bags, stating the number of charges left.",
+	"wolfhud_waypoints_show_first_aid_kit_title" : "Show First Aid Kits",
+	"wolfhud_waypoints_show_first_aid_kit_desc" : "Show Waypoints for First Aid Kits, showing its skill effects.",
 	"wolfhud_waypoints_show_body_bag_title" : "Show Bodybag Case",
 	"wolfhud_waypoints_show_body_bag_desc" : "Show Waypoints for bodybag cases, telling you the amount of Bodybags left.",
 	"wolfhud_waypoints_show_grenade_crate_title" : "Show Grenade Case",
