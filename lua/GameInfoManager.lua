@@ -315,7 +315,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			doctor_bag =						"doc_bag",
 			first_aid_kit = 					"first_aid_kit",
 			bodybags_bag =						"body_bag",
-			grenade_crate =					"grenade_crate",
+			grenade_crate =						"grenade_crate",
 		},
 		AMOUNT_OFFSETS = {
 			--interaction_id or editor_id
@@ -1275,7 +1275,10 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				self._player_actions[id].t = t
 				self._player_actions[id].expire_t = expire_t
 			elseif event == "set_data" then
-				self._player_actions[id].data = data
+				self._player_actions[id].data = self._player_actions[id].data or {}
+				for k, v in pairs(data) do
+					self._player_actions[id].data[k] = v
+				end
 			end
 			
 			self:_listener_callback("player_action", event, id, self._player_actions[id])
@@ -2880,6 +2883,7 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 	local _interupt_action_interact_original = PlayerStandard._interupt_action_interact
 	local _start_action_use_item_original = PlayerStandard._start_action_use_item
 	local _interupt_action_use_item_original = PlayerStandard._interupt_action_use_item
+	local _update_use_item_timers_original = PlayerStandard._update_use_item_timers
 	local _start_action_reload_original = PlayerStandard._start_action_reload
 	local _update_reload_timers_original = PlayerStandard._update_reload_timers
 	local _interupt_action_reload_original = PlayerStandard._interupt_action_reload
@@ -2935,7 +2939,8 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 			managers.gameinfo:event("buff", "set_value", "die_hard", { value = value })
 		end
 		
-		managers.gameinfo:event("player_action", "activate", "interact", { duration = timer })
+		local t = Application:time()
+		managers.gameinfo:event("player_action", "activate", "interact", { t = t, duration = timer })
 		managers.gameinfo:event("player_action", "set_data", "interact", { interact_id = interact_object:interaction().tweak_data })
 		
 		return _start_action_interact_original(self, t, input, timer, interact_object, ...)
@@ -2954,9 +2959,8 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 		local value = _interupt_action_interact_original(self, t, input, complete, ...)
 		
 		if self._equip_weapon_expire_t and not previous_weapon_exire_t then
-			local t = managers.player:player_timer():time()
-			local duration = self._equip_weapon_expire_t - t
-			managers.gameinfo:event("player_action", "activate", "interact_debuff", { t = t, duration = duration })
+			local t = Application:time()
+			managers.gameinfo:event("player_action", "activate", "interact_debuff", { t = t, expire_t = self._equip_weapon_expire_t })
 		end
 		
 		return value
@@ -2980,12 +2984,20 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 		local value = _interupt_action_use_item_original(self, t, input, complete, ...)
 		
 		if self._equip_weapon_expire_t and not previous_weapon_exire_t then
-			local t = managers.player:player_timer():time()
-			local duration = self._equip_weapon_expire_t - t
-			managers.gameinfo:event("player_action", "activate", "interact_debuff", { t = t, duration = duration })
+			local t = Application:time()
+			managers.gameinfo:event("player_action", "activate", "interact_debuff", { t = t, expire_t = self._equip_weapon_expire_t })
 		end
 		
 		return value
+	end
+	
+	function PlayerStandard:_update_use_item_timers(...)
+		_update_use_item_timers_original(self, ...)
+		
+		if self._use_item_expire_t then
+			local valid = managers.player:check_selected_equipment_placement_valid(self._unit)
+			managers.gameinfo:event("player_action", "set_data", "interact", { invalid = not valid })
+		end
 	end
 	
 	function PlayerStandard:_start_action_reload(t, ...)
@@ -3115,6 +3127,27 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 		end
 	end
 	
+end
+
+if string.lower(RequiredScript) == "lib/units/beings/player/states/playermaskoff" then
+	local _start_action_state_standard_original = PlayerMaskOff._start_action_state_standard
+	local _interupt_action_start_standard_original = PlayerMaskOff._interupt_action_start_standard
+	
+	function PlayerMaskOff:_start_action_state_standard(...)
+		local timer = tweak_data.player.put_on_mask_time or 2
+		managers.gameinfo:event("player_action", "activate", "interact", { duration = timer })
+		managers.gameinfo:event("player_action", "set_data", "interact", { interact_id = "mask_up" })
+		
+		return _start_action_state_standard_original(self, ...)
+	end
+	
+	function PlayerMaskOff:_interupt_action_start_standard(t, input, complete, ...)
+		if self._start_standard_expire_t then
+			managers.gameinfo:event("player_action", "deactivate", "interact")
+		end
+		
+		return _interupt_action_start_standard_original(self, t, input, complete, ...)
+	end
 end
 
 if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
@@ -3473,6 +3506,11 @@ if string.lower(RequiredScript) == "lib/player_actions/skills/playeractionammoef
 				managers.gameinfo:event("buff", "set_stack_count", "ammo_efficiency", { stack_count = target_headshots - headshots })
  			end
 		end
+		
+		--local duration = math.max(target_time - Application:time(), 0)
+		--player_manager:register_message(Message.OnHeadShot, "ammo_efficiency_buff_listener", on_headshot)
+		--managers.gameinfo:event("buff", "activate", "ammo_efficiency")
+		--managers.gameinfo:event("buff", "set_duration", "ammo_efficiency", { duration = duration })
 		
 		ammo_efficieny_original(player_manager, target_headshots, bullet_refund, target_time, ...)
 		

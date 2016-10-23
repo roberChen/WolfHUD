@@ -34,7 +34,7 @@ if RequiredScript == "lib/managers/hudmanager" then
 					bullet_storm 		= { texture = "guis/textures/pd2/skilltree_2/icons_atlas_2", texture_rect = {4 * 80, 5 * 80, 80, 80} },
 				},
 				doc_bag = {
-					damage_reduction 	= { texture = "guis/textures/pd2/skilltree_2/icons_atlas_2", texture_rect = {0 * 80, 10 * 80, 80, 80} },
+					damage_reduction 	= { texture = "guis/textures/pd2/skilltree_2/icons_atlas_2", texture_rect = {1 * 80, 11 * 80, 80, 80} },
 				},
 				first_aid_kit = {
 					damage_reduction 	= { texture = "guis/textures/pd2/skilltree_2/icons_atlas_2", texture_rect = {1 * 80, 11 * 80, 80, 80} },

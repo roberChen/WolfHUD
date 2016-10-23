@@ -2,9 +2,8 @@ if not _G.WolfHUD then
 	_G.WolfHUD = {}
 	WolfHUD.mod_path = ModPath
 	WolfHUD.save_path = SavePath
-	WolfHUD.settings_path = WolfHUD.save_path .. "WolfHUD.txt"
-	WolfHUD.colors_file = "WolfHUD_Colors.txt"
-	WolfHUD.inv_names_file = "WolfHUD_InventoryNames.txt"
+	WolfHUD.settings_path = WolfHUD.save_path .. "WolfHUD.json"
+	WolfHUD.tweak_file = "WolfHUDTweakData.lua"
 	WolfHUD.LOG_MODE = { error = true, warning = false, info = false }		-- error, info, warning or all
 	WolfHUD.version = "1.0"
 	WolfHUD.menu_ids = { 
@@ -35,50 +34,20 @@ if not _G.WolfHUD then
 		"wolfhud_gadget_options_menu",
 		"wolfhud_gadget_laser_options_menu"
 	}
-	WolfHUD.settings = {}
 	
-	if not WolfHUD.color_table then
-		WolfHUD.color_table = { -- namestring is always 'wolfhud_colors_<name>'
-			{ color = 'FFFFFF', name = "white" },
-			{ color = 'F2F250', name = "light_yellow" },
-			{ color = 'F2C24E', name = "light_orange" },
-			{ color = 'E55858', name = "light_red" },
-			{ color = 'CC55CC', name = "light_purple" },
-			{ color = '00FF00', name = "light_green" },
-			{ color = '00FFFF', name = "light_blue" },
-			{ color = 'BABABA', name = "light_gray" },
-			{ color = 'FFFF00', name = "yellow" },
-			{ color = 'FFA500', name = "orange" },
-			{ color = 'FF0000', name = "red" },
-			{ color = '800080', name = "purple" },
-			{ color = '008000', name = "green" },
-			{ color = '0000FF', name = "blue" },
-			{ color = '808080', name = "gray" },
-			{ color = '000000', name = "black" },
-			{ color = '000000', name = "rainbow" },
-		}
-	end
-	if not WolfHUD.inventory_names then		
-		
-		if io.file_is_readable(WolfHUD.mod_path .. WolfHUD.inv_names_file) then
-			if not io.file_is_readable(WolfHUD.save_path ..WolfHUD.inv_names_file) then
-				local source = io.open(WolfHUD.mod_path .. WolfHUD.inv_names_file, "r")
-				local dest = io.open(WolfHUD.save_path ..WolfHUD.inv_names_file, "w+")
-				if source and dest then
-					dest:write(source:read("*all"))
-					source:close()
-					dest:close()
-				end
-			end
-			os.remove(WolfHUD.mod_path .. WolfHUD.inv_names_file)
+	if not WolfHUD.tweak_path then		-- Populate tweak data
+		local tweak_path = string.format("%s%s", WolfHUD.save_path, WolfHUD.tweak_file)
+		if not io.file_is_readable(tweak_path) then
+			tweak_path = string.format("%s%s", WolfHUD.mod_path, WolfHUD.tweak_file)
 		end
-		
-		local file = io.open(WolfHUD.save_path .. WolfHUD.inv_names_file, "r")
-		if file then
-			WolfHUD.inventory_names = json.decode(file:read("*all"))
-			file:close()
+		if io.file_is_readable(tweak_path) then
+			dofile(tweak_path)
+			WolfHUD.tweak_data = WolfHUDTweakData:new()
+		else
+			WolfHUD:print_log(string.format("Tweak Data file couldn't be found! (%s)", tweak_path), "error")
 		end
 	end
+	WolfHUD.settings = {}
 	
 	WolfHUD.hook_files = WolfHUD.hook_files or {
 		["lib/setups/setup"] = { "GameInfoManager.lua", "WaypointsManager.lua" },
@@ -140,6 +109,7 @@ if not _G.WolfHUD then
 		["lib/units/beings/player/huskplayermovement"] = { "DownCounter.lua" },
 		["lib/units/beings/player/states/playercivilian"] = { "Interaction.lua" },
 		["lib/units/beings/player/states/playerstandard"] = { "GameInfoManager.lua", "EnemyHealthbar.lua", "Interaction.lua", "BurstFire.lua", "WeaponGadgets.lua" },
+		["lib/units/beings/player/states/playermaskoff"] = { "GameInfoManager.lua" },
 		["lib/units/beings/player/states/playerbleedout"] = { "DownCounter.lua" },
 		["lib/units/vehicles/vehicledamage"] = { "DamageIndicator.lua" },
 		["lib/units/vehicles/vehicledrivingext"] = { "CustomWaypoints.lua" },
@@ -603,7 +573,7 @@ if not _G.WolfHUD then
 			if val_type == "color" then
 				local id = self:getColorID(value)
 				if id then
-					return Color(self.color_table[id].color)
+					return Color(self.tweak_data.color_table[id].color)
 				end
 			else
 				return value
@@ -625,30 +595,9 @@ if not _G.WolfHUD then
 		end
 	end
 	
-	
-	function WolfHUD:populate_colors()
-		if io.file_is_readable(self.save_path .. self.colors_file) then
-			local file = io.open(self.save_path .. self.colors_file, "r")
-			if file then
-				local colors = json.decode(file:read("*all"))
-				for k, v in ipairs(colors) do
-					if not self:getColorID(v.name) then
-						table.insert(self.color_table, v)
-					end
-				end
-				file:close()
-			end
-		end
-		local file = io.open(self.save_path .. self.colors_file, "w+")
-		if file then
-			file:write(json.encode(self.color_table))
-			file:close()
-		end
-	end
-	
 	function WolfHUD:getColorID(name)
-		if type(name) == "string" then
-			for i, data in ipairs(WolfHUD.color_table) do
+		if tweak_data and type(name) == "string" then
+			for i, data in ipairs(self.tweak_data.color_table) do
 				if name == data.name then
 					return i
 				end
@@ -656,13 +605,13 @@ if not _G.WolfHUD then
 		end
 	end
 	
-	WolfHUD:populate_colors()
 	WolfHUD:Reset()
 	WolfHUD:Load()
 end
 
 if RequiredScript then
 	local requiredScript = RequiredScript:lower()
+	
 	if WolfHUD.hook_files[requiredScript] then
 		for __, file in ipairs(WolfHUD.hook_files[requiredScript]) do
 			dofile( WolfHUD.mod_path .. "lua/" .. file )
@@ -920,6 +869,10 @@ Hooks:Add("MenuManagerInitialize", "MenuManagerInitialize_WolfHUD", function(men
 	MenuHelper:LoadFromJsonFile(WolfHUD.mod_path .. "menu/hud_drivinghud.json", 			WolfHUD, WolfHUD.settings)
 	
 	Hooks:Add( "MenuManagerPostInitialize", "MenuManagerPostInitialize_WolfHUD", function( menu_manager )
+		if not WolfHUD.tweak_data then 
+			WolfHUD:print_log("Tweak_Data not found!", "error")
+			return 
+		end
 		for __, menu_id in ipairs(WolfHUD.menu_ids) do
 			local menu = MenuHelper:GetMenu(menu_id)
 			if menu then
@@ -927,7 +880,7 @@ Hooks:Add("MenuManagerInitialize", "MenuManagerInitialize_WolfHUD", function(men
 					if menu_item and menu_item._type == "multi_choice" and #menu_item._options <= 1 then
 						menu_item:clear_options()
 						local add_rainbow = #menu_item._options > 0
-						for k, v in ipairs(WolfHUD.color_table) do
+						for k, v in ipairs(WolfHUD.tweak_data.color_table) do
 							if add_rainbow or v.name ~= "rainbow" then
 								local color_name = managers.localization:text("wolfhud_colors_" .. v.name)
 								color_name = not color_name:lower():find("error") and color_name or string.upper(v.name)

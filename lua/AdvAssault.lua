@@ -117,7 +117,6 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudassaultcorner" then
 		self:update_hudlist_offset(false)
 	end
 
-	function HUDAssaultCorner:set_control_info(...) end
 	function HUDAssaultCorner:show_casing(...) 
 --		show_casing_original(self, ...)
 --		self:update_hudlist_offset(true)

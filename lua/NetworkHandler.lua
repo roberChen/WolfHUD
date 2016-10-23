@@ -1,4 +1,4 @@
---do return end	-- Disabled cause: WiP
+do return end	-- Disabled cause: WiP
 WolfHUD.Sync = WolfHUD.Sync or {}
 WolfHUD.Sync.peers = WolfHUD.Sync.peers or {false, false, false, false}
 WolfHUD.Sync.cache = WolfHUD.Sync.cache or {}

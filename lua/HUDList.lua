@@ -370,7 +370,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		standard_armor_regeneration = { "standard_armor_regeneration" },
 		weapon_charge = { "weapon_charge" },
 		melee_charge = { "melee_charge" },
-		reload = {"reload" }, 
+		reload = { "reload" }, 
 		interact = { "interact"},
 		interact_debuff = { "interact_debuff" },
 		
@@ -4920,6 +4920,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 	HUDList.TimedInteractionItem = HUDList.TimedInteractionItem or class(HUDList.TimedBuffItem)
 	HUDList.TimedInteractionItem.INTERACT_ID_TO_ICON = {
 		default 					= { texture = "guis/textures/pd2/skilltree/drillgui_icon_faster" 														},
+		mask_up 					= { texture = "guis/textures/contact_vlad", 									 texture_rect = {1920, 256, 128, 130}	},
 		ammo_bag 					= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 1*64, 0, 64, 64 } 	},
 		doc_bag 					= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 2*64, 7*64, 64, 64 } 	},
 		first_aid_kit 				= { texture = "guis/textures/pd2/skilltree/icons_atlas", 						 texture_rect = { 3*64, 10*64, 64, 64 } },
@@ -4952,6 +4953,13 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		HUDList.TimedInteractionItem.super.set_data(self, id, data)
 		if data.data then
 			self:_set_icon(data.data.interact_id)
+			
+			local color = self._default_icon_color
+			if data.data.invalid then
+				color = HUDList.BuffItemBase.ICON_COLOR.DEBUFF
+			end
+			self._icon:set_color(color)
+			self._ace_icon:set_color(color)
 		end
 	end
 	
@@ -4962,7 +4970,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		if icon_data and alive(self._icon) then
 			local texture, texture_rect
 			if type(icon_data) == "string" then
-				texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon_data)
+				texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon_data, {0, 0, 32, 32})
 			else
 				texture, texture_rect = icon_data.texture, icon_data.texture_rect
 			end
