@@ -86,9 +86,9 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
         
         --Left side list
         show_timers 					= WolfHUD:getSetting("show_timers", "boolean"),     				--Drills, time locks, hacking etc.
---      show_equipment 					= WolfHUD:getSetting("show_equipment", "boolean"),  				--Deployables (ammo, doc bags, body bags)
 		show_ammo_bags 					= WolfHUD:getSetting("show_ammo_bags", "boolean"),
 		show_doc_bags 					= WolfHUD:getSetting("show_doc_bags", "boolean"),
+		show_first_aid_kits				= WolfHUD:getSetting("show_first_aid_kits", "boolean"),
 		show_body_bags 					= WolfHUD:getSetting("show_body_bags", "boolean"),
 		show_grenade_crates 			= WolfHUD:getSetting("show_grenade_crates", "boolean"),
         show_sentries 					= WolfHUD:getSetting("show_sentries", "boolean"),   				--Deployable sentries
@@ -847,6 +847,10 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		self:_bag_deployable_event(event, key, data, HUDList.BagEquipmentItem, "doc_bag")
 	end
 	
+	function HUDListManager:_first_aid_kit_event(event, key, data)
+		self:_bag_deployable_event(event, key, data, HUDList.BagEquipmentItem, "first_aid_kit")
+	end
+	
 	function HUDListManager:_body_bag_event(event, key, data)
 		self:_bag_deployable_event(event, key, data, HUDList.BodyBagItem, "body_bag")
 	end
@@ -1115,6 +1119,10 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 	
 	function HUDListManager:_set_show_doc_bags()
 		self:_update_deployable_list_items("doc_bag", HUDListManager.ListOptions.show_doc_bags)
+	end
+	
+	function HUDListManager:_set_show_first_aid_kits()
+		self:_update_deployable_list_items("first_aid_kit", HUDListManager.ListOptions.show_first_aid_kits)
 	end
 	
 	function HUDListManager:_set_show_body_bags()
@@ -2100,6 +2108,11 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			or icon.hudicons and "guis/textures/hud_icons"
 		local texture_rect = (icon.spec or icon.atlas) and { x * 64, y * 64, 64, 64 } or icon.waypoints or icon.hudtabs or icon.hudpickups or icon.hudicons or icon.texture_rect
 		
+		self._default_text_color = HUDListManager.ListOptions.list_color or Color.white
+		self._default_icon_color = icon.color or self._default_text_color
+		self._change_upwards_color = Color.green
+		self._change_downwards_color = Color.red
+		
 		self._icon = self._panel:bitmap({
 			name = "icon",
 			texture = texture,
@@ -2108,7 +2121,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			w = self._panel:w() * (icon.w_ratio or 1),
 			alpha = icon.alpha or 1,
 			blend_mode = icon.blend_mode or "normal",
-			color = icon.color or HUDListManager.ListOptions.list_color or Color.white,
+			color = self._default_icon_color,
 		})
 		
 		self._box = HUDBGBox_create(self._panel, { w = self._panel:w(),	h = self._panel:w() }, { color = HUDListManager.ListOptions.list_color, bg_color = HUDListManager.ListOptions.list_color_bg })
@@ -2121,7 +2134,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			vertical = "center",
 			w = self._box:w(),
 			h = self._box:h(),
-			color = HUDListManager.ListOptions.list_color or Color.white,
+			color = self._default_text_color,
 			font = tweak_data.hud_corner.assault_font,
 			font_size = self._box:h() * 0.6
 		})
@@ -2131,6 +2144,11 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 	
 	function HUDList.RightListItem:change_count(diff)
 		self:set_count(self._count + diff)
+		
+		if diff ~= 0 then
+			self._text:stop()
+			self._text:animate(callback(self, self, "_animate_change"), diff)
+		end
 	end
 	
 	function HUDList.RightListItem:set_count(num)
@@ -2142,6 +2160,18 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 	function HUDList.RightListItem:get_count()
 		return self._count or 0
  	end
+	
+	function HUDList.RightListItem:_animate_change(item, diff)
+		if alive(item) and diff ~= 0 then
+			local color = diff > 0 and self._change_upwards_color or self._change_downwards_color
+			local t = 0.5
+			while t > 0 do
+				t = t - coroutine.yield()
+				item:set_color(math.lerp(self._default_text_color, color, t * 2))
+			end
+			item:set_color(self._default_text_color)
+		end
+	end
 	
 	
 	HUDList.UnitCountItem = HUDList.UnitCountItem or class(HUDList.RightListItem)
@@ -2236,6 +2266,8 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 	function HUDList.UsedPagersItem:init(...)
 		HUDList.UsedPagersItem.super.init(self, ...)
 		
+		self._change_upwards_color = Color.red
+		
 		self._listener_clbks = {
 			{
 				name = "HUDList_pager_count_listener",
@@ -2268,7 +2300,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			HUDList.UsedPagersItem.super.set_count(self, num)
 			
 			if self._count >= 4 then
-				self._text:set_color(Color(1, 0.2, 0))
+				self._default_text_color = Color(1, 0.2, 0)
 			end
 		end
 	end
@@ -2333,8 +2365,8 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			{
 				name = "HUDList_bodybags_count_listener",
 				source = "bodybags",
-				event = { "set" },
-				clbk = callback(self, self, "_change_bodybag_count"),
+				event = { "change" },
+				clbk = callback(self, self, "change_count"),
 				data_only = true,
 			},
 			{
@@ -2349,17 +2381,13 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		self:set_count(managers.gameinfo:get_bodybag_amount())
 	end
 	
-	function HUDList.BodyBagsInvItem:_change_bodybag_count(amount)
-		self:set_count(amount)
-	end
-	
 	function HUDList.BodyBagsInvItem:_whisper_mode_change(status)
 		self:set_active(self._count > 0 and status)
 	end
 	
-	function HUDList.BodyBagsInvItem:set_count(num)
+	function HUDList.BodyBagsInvItem:change_count(diff)
 		if managers.groupai:state():whisper_mode() then
-			HUDList.BodyBagsInvItem.super.set_count(self, num)
+			HUDList.BodyBagsInvItem.super.change_count(self, diff)
 		end
 	end
 	
@@ -2655,6 +2683,11 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			end
 			
 			self:set_count(unbagged_count, bagged_count)
+			
+			if value ~= 0 then
+				self._text:stop()
+				self._text:animate(callback(self, self, "_animate_change"), value)
+			end
 		end
  	end
 	
@@ -2938,6 +2971,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		sentry 			= {	atlas 		= { 7,  5 }, priority = 1 },
 		ammo_bag 		= {	atlas 		= { 1,  0 }, priority = 3 },
 		doc_bag 		= {	atlas 		= { 2,  7 }, priority = 4 },
+		first_aid_kit	= {	atlas 		= { 3, 10 }, priority = 4 },
 		body_bag 		= {	atlas 		= { 5, 11 }, priority = 5 },
 		grenade_crate 	= {	preplanning = { 1,  0 }, priority = 2 },
 	}
@@ -2958,6 +2992,7 @@ if string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 		local texture_rect = (icon_data.atlas or icon_data.preplanning) and { x * w, y * w, w, w }
 		
 		self._box = HUDBGBox_create(self._panel, {
+				name = "bg_box",
 				w = self._panel:w(),
 				h = self._panel:h(),
 			}, { color = HUDListManager.ListOptions.list_color, bg_color = HUDListManager.ListOptions.list_color_bg })

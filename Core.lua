@@ -73,7 +73,7 @@ if not _G.WolfHUD then
 		["lib/managers/hud/hudsuspicion"] = { "NumbericSuspicion.lua" },
 		["lib/managers/hud/hudhitdirection"] = { "DamageIndicator.lua" },
 		["lib/managers/enemymanager"] = { "GameInfoManager.lua" },
-		["lib/managers/group_ai_states/groupaistatebase"] = { "GameInfoManager.lua", "PacifiedCivs.lua", "CustomWaypoints.lua" },
+		["lib/managers/group_ai_states/groupaistatebase"] = { "GameInfoManager.lua", "PacifiedCivs.lua" },
 		["lib/managers/missionassetsmanager"] = { "BuyAllAsset.lua" },
 		["lib/managers/menu/blackmarketgui"] = { "MenuTweaks.lua" },
 		["lib/managers/menu/stageendscreengui"] = { "MenuTweaks.lua" },
@@ -264,6 +264,7 @@ if not _G.WolfHUD then
 			show_timers 							= true,     --Drills, time locks, hacking etc.
 			show_ammo_bags							= true,  	--Deployables (ammo)
 			show_doc_bags							= true,  	--Deployables (doc bags)
+			show_first_aid_kits						= false,	--Deployables (first_aid_kits)
 			show_body_bags							= true,  	--Deployables (body bags)
 			show_grenade_crates						= true,  	--Deployables (grenades)
 			show_sentries 							= true,   	--Deployable sentries
@@ -481,33 +482,33 @@ if not _G.WolfHUD then
 	
 	function WolfHUD:AskOverride(data, setting, notif_id)
 		local menu_options = {
-		[1] = {
-			text = managers.localization:text("dialog_yes"),
-			callback = function(self, item)
-				WolfHUD.settings[setting] = true
-				WolfHUD:Save()
-				WolfHUD:createOverrides(data)
-				if notif_id and NotificationsManager:NotificationExists( notif_id ) then
-					NotificationsManager:UpdateNotification( notif_id, 
-						managers.localization:text("woldhud_notification_restart_override_title", { NAME = data.display_name }), 
-						managers.localization:text("woldhud_notification_restart_override_desc"), 20, function() end	
-					)
-				end
-			end,
-		},
-		[2] = {
-			text = managers.localization:text("dialog_no"),
-			callback = function(self, item)
-				WolfHUD.settings[setting] = false
-				WolfHUD:Save()
-				WolfHUD:createOverrideNotification(data, setting)
-			end,
-		},
-		[3] = {
-			text = managers.localization:text("wolfhud_dialog_remind_later"),
-			is_cancel_button = true,
-		},
-}
+			[1] = {
+				text = managers.localization:text("dialog_yes"),
+				callback = function(self, item)
+					WolfHUD.settings[setting] = true
+					WolfHUD:Save()
+					WolfHUD:createOverrides(data)
+					if notif_id and NotificationsManager:NotificationExists( notif_id ) then
+						NotificationsManager:UpdateNotification( notif_id, 
+							managers.localization:text("woldhud_notification_restart_override_title", { NAME = data.display_name }), 
+							managers.localization:text("woldhud_notification_restart_override_desc"), 20, function() end	
+						)
+					end
+				end,
+			},
+			[2] = {
+				text = managers.localization:text("dialog_no"),
+				callback = function(self, item)
+					WolfHUD.settings[setting] = false
+					WolfHUD:Save()
+					WolfHUD:createOverrideNotification(data, setting)
+				end,
+			},
+			[3] = {
+				text = managers.localization:text("wolfhud_dialog_remind_later"),
+				is_cancel_button = true,
+			},
+		}
 		return QuickMenu:new( managers.localization:text("wolfhud_dialog_install_title", { NAME = data["display_name"] }), 
 								string.format("%s\n\n%s", managers.localization:text(string.format("wolfhud_dialog_install_%s_desc", data["identifier"])), managers.localization:text("wolfhud_dialog_install_desc", { NAME = data["display_name"]})) ,
 								menu_options, true )
@@ -597,7 +598,7 @@ if not _G.WolfHUD then
 	
 	function WolfHUD:getColorID(name)
 		if tweak_data and type(name) == "string" then
-			for i, data in ipairs(self.tweak_data.color_table) do
+			for i, data in ipairs(self.tweak_data.color_table or {}) do
 				if name == data.name then
 					return i
 				end
@@ -880,7 +881,7 @@ Hooks:Add("MenuManagerInitialize", "MenuManagerInitialize_WolfHUD", function(men
 					if menu_item and menu_item._type == "multi_choice" and #menu_item._options <= 1 then
 						menu_item:clear_options()
 						local add_rainbow = #menu_item._options > 0
-						for k, v in ipairs(WolfHUD.tweak_data.color_table) do
+						for k, v in ipairs(WolfHUD.tweak_data.color_table or {}) do
 							if add_rainbow or v.name ~= "rainbow" then
 								local color_name = managers.localization:text("wolfhud_colors_" .. v.name)
 								color_name = not color_name:lower():find("error") and color_name or string.upper(v.name)

@@ -322,6 +322,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			firstaid_box = -1,	--GGC drill asset, HB infirmary
 		},
 		AGGREAGATE_ITEMS = {
+			["first_aid_kit"] = "first_aid_kits",
 			[136859] = "hb_armory_grenade",
 			[136870] = "hb_armory_grenade",
 			[136869] = "hb_armory_grenade",
@@ -811,8 +812,10 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 	
 	function GameInfoManager:_bodybags_event(event, key, amount)
 		if event == "set" then
+			local change = amount - self._bodybag_amount
 			self._bodybag_amount = amount
 			self:_listener_callback("bodybags", "set", key, self._bodybag_amount)
+			self:_listener_callback("bodybags", "change", key, change)
 		end
 	end
 	
@@ -990,8 +993,8 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				printf("UPDATE AGGREGATE %s: %s", tostring(attr), tostring(total))
 			end
 			
-			local aggregate_key = GameInfoManager._EQUIPMENT.AGGREAGATE_ITEMS[self._deployables[type][key].unit:editor_id()]
-			WolfHUD:print_log(type .. " | " .. self._deployables[type][key].unit:editor_id(), "info")
+			local aggregate_key = GameInfoManager._EQUIPMENT.AGGREAGATE_ITEMS[type] or GameInfoManager._EQUIPMENT.AGGREAGATE_ITEMS[self._deployables[type][key].unit:editor_id()]
+			printf(type .. " | " .. self._deployables[type][key].unit:editor_id(), "info")
 			if event == "destroy" then
 				self:_listener_callback(type, "destroy", key, self._deployables[type][key])
 				self._deployables[type][key] = nil
@@ -1706,7 +1709,9 @@ if string.lower(RequiredScript) == "lib/managers/group_ai_states/groupaistatebas
 	
 	function GroupAIStateBase:sync_converted_enemy(converted_enemy, ...)
 		sync_converted_enemy_original(self, converted_enemy, ...)
-		managers.gameinfo:event("minion", "add", tostring(converted_enemy:key()), { unit = converted_enemy })
+		if self._police[converted_enemy:key()] then
+			managers.gameinfo:event("minion", "add", tostring(converted_enemy:key()), { unit = converted_enemy })
+		end
 	end
 	
 	function GroupAIStateBase:set_whisper_mode(enabled, ...)
@@ -2151,7 +2156,7 @@ if string.lower(RequiredScript) == "lib/units/equipment/first_aid_kit/firstaidki
 		local key = tostring(unit:key())
 		managers.gameinfo:event("first_aid_kit", "create", key, { unit = unit })
 		init_original(self, unit, ...)
-		managers.gameinfo:event("first_aid_kit", "set_max_amount", key, { max_amount = 1 })
+		managers.gameinfo:event("first_aid_kit", "set_amount", key, { amount = 1 })
 	end
 	
 	function FirstAidKitBase:sync_setup(bits, peer_id, ...)

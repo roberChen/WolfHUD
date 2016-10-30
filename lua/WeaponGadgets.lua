@@ -77,7 +77,7 @@ if string.lower(RequiredScript) == "lib/units/weapons/weaponlaser" and WolfHUD:g
 		local theme = self._theme_type
 		local suffix = self._suffix_map[theme]
 		local col = Color.white
-		if suffix then 
+		if suffix and self._themes[theme] then 
 			if WolfHUD:getSetting("laser_" .. suffix, "string") == "rainbow" then
 				local r, g, b = math.sin(135 * t + 0) / 2 + 0.5, math.sin(140 * t + 60) / 2 + 0.5, math.sin(145 * t + 120) / 2 + 0.5
 				col = Color(r, g, b)

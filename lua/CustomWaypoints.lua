@@ -248,6 +248,8 @@ if RequiredScript == "lib/managers/hudmanager" then
 					local amount = (data.amount or 0) + (data.amount_offset or 0)
 					if type == "ammo_bag" then
 						amount = string.format("%.0f%%", amount * 100)
+					elseif type == "first_aid_kit" then
+						amount = ""
 					else
 						amount = amount > 0 and tostring(amount) or ""
 					end

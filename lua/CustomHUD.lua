@@ -3388,13 +3388,13 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			local text_id, macros = "hud_action_generic", {}
 			if tweak_entry then
 				text_id = tweak_entry.action_text_id or "hud_deploying_equipment"
-				macros = { EQUIPMENT = (tweak_entry.text_id and managers.localization:text(tweak_entry.text_id) or "") }
+				macros = { EQUIPMENT = (tweak_entry.text_id and managers.localization:text(tweak_entry.text_id) or ""), BTN_INTERACT = managers.localization:get_default_macro("BTN_INTERACT") }
 			end
-			local text = managers.localization:text(text_id, macros) or ""
+			local text = managers.localization:to_upper_text(text_id, macros) or ""
 			
 			self:set_enabled("active", true)
 			self._text:set_color(Color.white)
-			self._text:set_text(string.format("%s (%.1fs)", utf8.to_upper(text), timer))
+			self._text:set_text(string.format("%s (%.1fs)", text, timer))
 			self:arrange()
 			self._panel:animate(callback(self, self, "_animate"), timer)
 		end
@@ -3749,7 +3749,7 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 		elseif type_index == 2 then
 			interact_tweak = tweak_data.equipments
 		elseif type_index == 3 then
-			interact_tweak = { [id] = { action_text_id = "hud_starting_heist" } }
+			interact_tweak = { [tweak_data_id] = { action_text_id = "hud_starting_heist" } }
 		end
 		
 		local character_data = managers.criminals:character_data_by_peer_id(peer_id)
@@ -3835,7 +3835,8 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 			player_hud:set_alignment((player_pos < 3) and "left" or "right")
 			teammate_offset[player_pos] = teammate_offset[player_pos] + player_panel:h() + MARGIN
 			
-			local j = 1
+			local j = 0
+			local MAX_STACK_SIZE = math.max(math.ceil(#self._teammate_panels / 2), 7)
 			local teammate_pos = { math.clamp(WolfHUD:getSetting("TEAM_POSITION", "number", 1), 1, 3) }
 			table.insert(teammate_pos, (teammate_pos[1] > 1 and 1 or 3))
 			
@@ -3843,7 +3844,7 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 				local panel = teammate:panel()
 				
 				if i ~= HUDManager.PLAYER_PANEL and panel:visible() then
-					local team_stack = j < 7 and 1 or 2
+					local team_stack = j < MAX_STACK_SIZE and 1 or 2
 					
 					panel:set_center_x(getW(hud_w, panel:w(), teammate_pos[team_stack]))
 					panel:set_bottom(hud_h - teammate_offset[teammate_pos[team_stack]])
