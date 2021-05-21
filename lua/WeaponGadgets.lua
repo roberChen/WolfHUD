@@ -27,6 +27,7 @@ if RequiredScript == "lib/units/weapons/weapongadgetbase" then
 	function WeaponGadgetBase:init(...)
 		init_original(self, ...)
 
+		self.GADGET_TYPE = self.GADGET_TYPE or "unknown"
 		if WeaponGadgetBase.SPAWNED_UNITS[self.GADGET_TYPE] then
 			WeaponGadgetBase.SPAWNED_UNITS[self.GADGET_TYPE][self._unit:key()] = self._unit
 		end
@@ -59,24 +60,40 @@ if RequiredScript == "lib/units/weapons/weapongadgetbase" then
 
 	end
 
+	function WeaponGadgetBase:get_theme(theme)
+		if self._themes then
+			if theme then
+				return self._themes[theme]
+			else
+				return self._theme_type and self._themes[self._theme_type] or self._themes.default
+			end
+		end
+	end
+
 	function WeaponGadgetBase:_set_theme(theme)
+
+	end
+
+	function WeaponGadgetBase:_modify_color(color, intensity)
 
 	end
 
 	function WeaponGadgetBase:_update_effects(data, t, dt)
 		if data then
-			local color
+			local color, intensity
 
 			if data.rainbow then
 				local r = t * 360 * data.rainbow.frequency
 				color = Vector3((1 + math.sin(r + 0)) / 2, (1 + math.sin(r + 120)) / 2, (1 + math.sin(r + 240)) / 2)
-				self:set_color(color)
 			end
 
 			if data.pulse then
 				local r = 0.5 + 0.5 * math.sin(t * 180 * data.pulse.frequency)
-				local intensity = math.lerp(data.pulse.min, data.pulse.max, r)
-				self:_set_pulse_intensity(intensity, color)
+				intensity = math.lerp(data.pulse.min, data.pulse.max, r)
+			end
+
+			if color or intensity then
+				self:_modify_color(color, intensity)
 			end
 		end
 	end
@@ -92,14 +109,25 @@ elseif RequiredScript == "lib/units/weapons/weaponlaser" then
 		self:refresh_themes()
 	end
 
+	function WeaponLaser:set_color(color)	--OVERWRITE
+		self._custom_color = Vector3(color:unpack())
+
+		self:refresh_themes()
+	end
+
+	function WeaponLaser:color()	--OVERWRITE
+		local theme = self._themes[self._theme_type] or self._themes.default
+		
+		if theme and theme.brush then
+			return Color(theme.brush:unpack())
+		end
+
+		return tweak_data.custom_colors.defaults.laser
+	end
+
 	function WeaponLaser:update(unit, t, dt, ...)
 		update_original(self, unit, t, dt, ...)
 		self:_update_effects(self._themes[self._theme_type], t, dt)
-	end
-
-	function WeaponLaser:set_color(color)
-		local tmp = Vector3(color:unpack())
-		self:_set_colors(tmp, tmp, tmp)
 	end
 
 	function WeaponLaser:set_color_by_theme(type)
@@ -111,14 +139,14 @@ elseif RequiredScript == "lib/units/weapons/weaponlaser" then
 
 	function WeaponLaser:refresh_themes()
 		for theme, data in pairs(WeaponGadgetBase.THEME_SETTINGS.laser or {}) do
-			local beam = Vector3(data.beam.r, data.beam.g, data.beam.b)
+			local beam = data.beam.enabled and Vector3(data.beam.r, data.beam.g, data.beam.b) or self._custom_color or Vector3(tweak_data.custom_colors.defaults.laser:unpack())
 
 			self._themes[theme] = {
 				light = data.dot.match_beam and beam or Vector3(data.dot.r, data.dot.g, data.dot.b),
 				glow = data.glow.match_beam and beam or Vector3(data.glow.r, data.glow.g, data.glow.b),
-				brush = Vector3(data.beam.r, data.beam.g, data.beam.b),
+				brush = beam,
 				alpha = { dot = data.dot.a, glow = data.glow.a, beam = data.beam.a },
-				rainbow = data.rainbow.enabled and {
+				rainbow = data.beam.enabled and data.rainbow.enabled and {
 					frequency = data.rainbow.frequency,
 				},
 				pulse = data.pulse.enabled and {
@@ -133,11 +161,11 @@ elseif RequiredScript == "lib/units/weapons/weaponlaser" then
 		self:_set_theme(self._theme_type)
 	end
 
-	function WeaponLaser:_set_theme(theme)
-		self:set_color_by_theme(theme)
+	function WeaponLaser:_set_theme(theme_id)
+		self:set_color_by_theme(theme_id)
 	end
 
-	function WeaponLaser:_set_pulse_intensity(intensity, color)
+	function WeaponLaser:_modify_color(color, intensity)
 		self._current_intensity = intensity or self._current_intensity
 		self:_set_colors(color, color, color)
 	end
@@ -158,6 +186,7 @@ elseif RequiredScript == "lib/units/weapons/weaponlaser" then
 elseif RequiredScript == "lib/units/weapons/weaponflashlight" then
 	local init_original = WeaponFlashLight.init
 	local update_original = WeaponFlashLight.update
+	local set_color_original = WeaponFlashLight.set_color
 
 	WeaponFlashLight._themes = {}
 
@@ -176,6 +205,22 @@ elseif RequiredScript == "lib/units/weapons/weaponflashlight" then
 		end
 	end
 
+	function WeaponFlashLight:set_color(color, ...)	--OVERWRITE
+		if not self:is_haunted() then
+			self._custom_color = Vector3(color:unpack())
+
+			self:refresh_themes()
+		end
+	end
+
+	function WeaponFlashLight:color()	--OVERWRITE
+		local theme = self._themes[self._theme_type]
+		
+		if theme and theme.light then
+			return Color(theme.light:unpack())
+		end
+	end
+
 	function WeaponFlashLight:set_owner_unit(owner, is_akimbo)
 		if is_akimbo then
 			self._intensity_modifier = 0.5
@@ -190,10 +235,10 @@ elseif RequiredScript == "lib/units/weapons/weaponflashlight" then
 		for theme, data in pairs(WeaponGadgetBase.THEME_SETTINGS.flashlight or {}) do
 			self._themes[theme] = {
 				brightness = data.light.brightness,
-				light = Vector3(data.light.r, data.light.g, data.light.b),
+				light = data.light.enabled and Vector3(data.light.r, data.light.g, data.light.b) or self._custom_color or Vector3(tweak_data.custom_colors.defaults.flashlight:unpack()),
 				angle = data.light.angle,
 				range = data.light.range * 100,
-				rainbow = data.rainbow.enabled and {
+				rainbow = data.light.enabled and data.rainbow.enabled and {
 					frequency = data.rainbow.frequency,
 				},
 				pulse = data.pulse.enabled and {
@@ -208,31 +253,34 @@ elseif RequiredScript == "lib/units/weapons/weaponflashlight" then
 		self:_set_theme(self._theme_type)
 	end
 
-	function WeaponFlashLight:set_color(color)
-		self:_set_colors(color)
-	end
-
 	function WeaponFlashLight:_set_theme(theme)
 		self._theme_type = theme
 
 		if not self:is_haunted() then
 			local theme = self._themes[self._theme_type]
 
-			self:_set_colors(theme.light)
-			self._light:set_spot_angle_end(theme.angle)
-			self._light:set_far_range(theme.range)
+			if theme then
+				self:_set_colors(theme.light)
+				self._light:set_spot_angle_end(theme.angle)
+				self._light:set_far_range(theme.range)
+			end
 		end
 	end
 
-	function WeaponFlashLight:_set_pulse_intensity(intensity, color)
+	function WeaponFlashLight:_modify_color(color, intensity)
 		self._current_intensity = intensity or self._current_intensity
 		self:_set_colors(color)
 	end
 
 	function WeaponFlashLight:_set_colors(light)
 		local theme = self._themes[self._theme_type]
-		local light = light or theme.light
-		self._light:set_color(light * theme.brightness * (self._current_intensity or 1) * (self._intensity_modifier or 1))
+		local light = light or theme and theme.light
+		
+		if light then
+			--self._light:set_color(light * (theme.brightness or 1) * (self._current_intensity or 1) * (self._intensity_modifier or 1))
+			local light_color = Color(light.x, light.y, light.z) * (theme.brightness or 1) * (self._current_intensity or 1) * (self._intensity_modifier or 1)
+			set_color_original(self, light_color)
+		end
 	end
 
 elseif RequiredScript == "lib/units/weapons/raycastweaponbase" then
@@ -241,7 +289,7 @@ elseif RequiredScript == "lib/units/weapons/raycastweaponbase" then
 
 	function RaycastWeaponBase:setup(...)
 		setup_original(self, ...)
-		self:_update_gadget_owner(self._has_gadget)
+		self:_update_gadget_owner(self._gadgets or self._has_gadget)
 	end
 
 	function RaycastWeaponBase:_update_gadget_owner(gadgets)
@@ -298,24 +346,25 @@ end
 -- Laser Auto On
 if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 	function NewRaycastWeaponBase:_setup_laser()
-		if self._has_gadget then
-			local gadgets = clone(self._has_gadget)
-			table.sort(gadgets, function(x, y)
-				local xd = self._parts[x]
-				local yd = self._parts[y]
-				if not xd or not xd.unit then
-					return false
-				end
-				if not yd or not yd.unit then
-					return true
-				end
-				return xd.unit:base().GADGET_TYPE > yd.unit:base().GADGET_TYPE
-			end)
-
-			for i, part_id in ipairs(gadgets) do
-                local base = self._parts[part_id] and self._parts[part_id].unit and self._parts[part_id].unit:base()
+		if self._gadgets then
+			for i, part_id in ipairs(self._gadgets) do
+                local unit = self._parts[part_id] and self._parts[part_id].unit
+				local base = unit and unit:base()
 				if base and base.GADGET_TYPE and base.GADGET_TYPE == (WeaponLaser.GADGET_TYPE or "") then
-					self:set_gadget_on(i or 0, false)
+					self:set_gadget_on(i or 0, false, self._gadgets)
+					self._last_gadget_idx = self._gadget_on
+					
+					local owner = managers.player:player_unit()
+					if owner then
+						owner:inventory()._was_gadget_on = self._gadget_on	-- Prevent inventory from restoring wrong gadget state
+						if owner and owner:network() then					-- Sync gadget state and laser color to other players
+							owner:network():send("set_weapon_gadget_state", self._gadget_on)
+							if base.color then
+								local col = base:color() or Color(1, 0, 1, 0)
+								owner:network():send("set_weapon_gadget_color", col.r * 255, col.g * 255, col.b * 255)
+							end
+						end
+					end
 					break
 				end
 			end
@@ -323,39 +372,20 @@ if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 	end
 
 	local on_enabled_original = NewRaycastWeaponBase.on_enabled
-	local on_equip_original = NewRaycastWeaponBase.on_equip
-	local toggle_gadget_original = NewRaycastWeaponBase.toggle_gadget
-
 	function NewRaycastWeaponBase:on_enabled(...)
 		on_enabled_original(self, ...)
 
-		if WolfHUD:getSetting({"GADGETS", "LASER_AUTO_ON"}, true) and not self._saved_gadget_state then
+		if not self._init_laser_state and not self:is_npc() and self._assembly_complete and managers.player:current_state() == "standard" and WolfHUD:getSetting({"GADGETS", "LASER_AUTO_ON"}, true) then
 			self:_setup_laser()
-
-			--if alive(self._second_gun) then
-			--	self._second_gun:base():_setup_laser()
-			--end
-
-			self._saved_gadget_state = self._gadget_on or 0
+			self._init_laser_state = true
 		end
-	end
-
-	-- Save Gadget State, until the games code gets fixed...
-	function NewRaycastWeaponBase:on_equip(...)
-		on_equip_original(self, ...)
-		self:set_gadget_on(self._saved_gadget_state or 0, false)
-	end
-
-	function NewRaycastWeaponBase:toggle_gadget(...)
-		toggle_gadget_original(self, ...)
-		self._saved_gadget_state = self._gadget_on or 0
 	end
 end
 
 -- Rotated Secondary Sight
 if string.lower(RequiredScript) == "lib/units/cameras/fpcameraplayerbase" then
 	local clbk_stance_entered_original = FPCameraPlayerBase.clbk_stance_entered
-	FPCameraPlayerBase.angled_sight_rotation    = {
+	FPCameraPlayerBase.angled_sight_rotation = {
 		wpn_fps_upg_o_45iron = Rotation(0, 0, -45),
 		wpn_fps_upg_o_45rds = Rotation(0, 0, -45),
 		wpn_fps_upg_o_45rds_v2 = Rotation(0, 0, -45),

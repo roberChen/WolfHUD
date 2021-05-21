@@ -165,6 +165,7 @@ LoadoutPanel.NAME_TO_CLASS = {
 	melee_weapon			= { class = "LoadoutImageItem", 	 	params = { margin = 5 } },
 	grenade 				= { class = "LoadoutImageItem", 	 	params = { margin = 5 } },
 	mask					= { class = "LoadoutMaskItem", 		 	params = { margin = 5 } },
+	player_style			= { class = "LoadoutImageItem", 		params = { margin = 5 } },
 	armor 					= { class = "LoadoutImageItem", 	 	params = { margin = 5 } },
 	deployable 				= { class = "LoadoutDeployableItem", 	params = { margin = 5 } },
 	secondary_deployable 	= { class = "LoadoutDeployableItem", 	params = { margin = 5 } },
@@ -308,7 +309,7 @@ function LoadoutPanel:arrange()
 	end
 
 	if self:set_h(total_y + self._margin) and not self:destroyed() then
-		self._owner:arrange_loadout_panels()
+		self._owner:arrange_loadout_panels(self._owner_panel)
 	end
 
 end
@@ -327,7 +328,7 @@ function LoadoutPanel:set_outfit(outfit)
 	local outfit_changed = self:set_enabled("outfit", outfit and true or false)
 	local active_comp_changed = self:set_enabled("active_components", enabled)
 	if not self:destroyed() and outfit_changed or active_comp_changed then
-		self._owner:arrange_loadout_panels()
+		self._owner:arrange_loadout_panels(self._owner_panel)
 	end
 end
 
@@ -345,6 +346,21 @@ function LoadoutPanel:local_peer()
 	return self._local_peer
 end
 
+function LoadoutPanel:mark_cheater(status, reason)
+	for _, item_name in ipairs({"name", "character", "level"}) do
+		local item = self:items(item_name)
+		if item then
+			item:set_color(status and tweak_data.screen_colors.pro_color or item._default_color or Color.white)
+		end
+	end
+--[[
+	if status and managers.chat then	-- TODO: Needs localization
+		local message = string.format("[WolfHUD] %s is cheating: %s", self:get_peer():name(), reason or "N/A")
+		managers.chat:feed_system_message(ChatManager.GAME, message)
+	end
+]]
+end
+
 function LoadoutPanel:items(name)
 	if name then
 		return self._components[name]
@@ -359,12 +375,13 @@ function LoadoutTextItem:init(base_panel, owner, name, width, height, params)
 	LoadoutTextItem.super.init(self, base_panel, owner, name, width, height, params)
 
 	self._font_size = math.min(params.font_size or tweak_data.menu.pd2_medium_font_size, self._panel:h() - 2 * self._margin)
+	self._default_color = params.color or Color.white
 	self._loadout = ""
 
 	self._text = self._panel:text({
 		name = name,
 		text = params.text or "",
-		color = params.color or Color.white,
+		color = self._default_color,
 		alpha = params.alpha or 1,
 		align = params.align or "center",
 		vertical = "center",
@@ -424,12 +441,13 @@ function LoadoutImageItem:init(base_panel, owner, name, width, height, params)
 
 	self._hide_name = params.hide_name
 	self._font_size = params.font_size or tweak_data.menu.pd2_small_font_size
+	self._default_color = params.color or Color.white
 	self._loadout = ""
 
 	self._text = self._panel:text({
 		name = name .. "_title",
 		text = params.text or "",
-		color = params.color or Color.white,
+		color = self._default_color,
 		alpha = params.alpha or 1,
 		align = "left",
 		vertical = "center",
@@ -463,7 +481,7 @@ function LoadoutImageItem:init(base_panel, owner, name, width, height, params)
 		h = tweak_data.menu.pd2_small_font_size,
 		font_size = tweak_data.menu.pd2_small_font_size * 0.9,
 		font = tweak_data.menu.pd2_small_font,
-		color = params.color or Color.white,
+		color = self._default_color,
 		alpha = params.alpha or 1,
 		blend_mode = params.blend_mode or "normal",
 		align = "right",
@@ -481,51 +499,48 @@ function LoadoutImageItem:init(base_panel, owner, name, width, height, params)
 end
 
 function LoadoutImageItem:arrange()
-		if self:enabled() then
-			self._text:set_font_size(self._font_size * 0.95)
-			local _, _, w, h = self._text:text_rect()
-			while w > math.max(self._panel:w() - 2 * self._margin, 1) do
-				if self._text:font_size() > 11 then
-					self._text:set_font_size(self._text:font_size() - 0.1)
-				else
-					self._text:set_text(self._text:text():sub(1, self._text:text():len() - 1))
-				end
-				_, _, w, h = self._text:text_rect()
-			end
-
-			self._text:set_top(self._margin)
-			self._text:set_left(self._margin)
-			self._text:set_w(self._panel:w() - 2 * self._margin)
-
-			local max_w, max_h = self._panel:w() - 2 * self._margin, (self._panel:h() - (self._text:visible() and self._text:h() or 0)) - 2 * self._margin
-			local texture_w, texture_h = self._icon:texture_width() or 1, self._icon:texture_height() or 1
-
-			local calc_w = max_h * (texture_w / texture_h)
-			local calc_h = max_w * (texture_h / texture_w)
-
-			if calc_w < max_w then
-				self._icon:set_size(calc_w, max_h)
+	if self:enabled() then
+		self._text:set_font_size(self._font_size * 0.95)
+		local _, _, w, h = self._text:text_rect()
+		while w > math.max(self._panel:w() - 2 * self._margin, 1) do
+			if self._text:font_size() > 11 then
+				self._text:set_font_size(self._text:font_size() - 0.1)
 			else
-				self._icon:set_size(max_w, calc_h)
+				self._text:set_text(self._text:text():sub(1, self._text:text():len() - 1))
 			end
-
-			self._icon:set_center_x(self._panel:w() / 2)
-			self._icon:set_center_y(self._panel:h() / 2 + ((self._text:visible() and self._text:h() or 0) * 0.5))
-
-			self._amount_text:set_font_size(tweak_data.menu.pd2_small_font_size * 0.9)
-			local _, _, w, h = self._amount_text:text_rect()
-			while w > ((self._panel:w() - 2 * self._margin) / 2) do
-				if self._amount_text:font_size() > 10 then
-					self._amount_text:set_font_size(self._amount_text:font_size() - 0.1)
-				else
-					break
-				end
-				_, _, w, h = self._amount_text:text_rect()
-			end
-
-			self._amount_text:set_right(self._panel:w() - self._margin)
-			self._amount_text:set_bottom(self._panel:h() - self._margin)
+			_, _, w, h = self._text:text_rect()
 		end
+
+		self._text:set_top(self._margin)
+		self._text:set_left(self._margin)
+		self._text:set_w(self._panel:w() - 2 * self._margin)
+		local max_w, max_h = self._panel:w() - 2 * self._margin, (self._panel:h() - (self._text:visible() and self._text:h() or 0)) - 2 * self._margin
+		local texture_w, texture_h = self._icon:texture_width() or 1, self._icon:texture_height() or 1
+		local calc_w = max_h * (texture_w / texture_h)
+		local calc_h = max_w * (texture_h / texture_w)
+		if calc_w < max_w then
+		self._icon:set_size(calc_w, max_h)
+		else
+			self._icon:set_size(max_w, calc_h)
+		end
+
+		self._icon:set_center_x(self._panel:w() / 2)
+		self._icon:set_center_y(self._panel:h() / 2 + ((self._text:visible() and self._text:h() or 0) * 0.5))
+
+		self._amount_text:set_font_size(tweak_data.menu.pd2_small_font_size * 0.9)
+		local _, _, w, h = self._amount_text:text_rect()
+		while w > ((self._panel:w() - 2 * self._margin) / 2) do
+			if self._amount_text:font_size() > 10 then
+				self._amount_text:set_font_size(self._amount_text:font_size() - 0.1)
+			else
+				break
+			end
+			_, _, w, h = self._amount_text:text_rect()
+		end
+
+		self._amount_text:set_right(self._panel:w() - self._margin)
+		self._amount_text:set_bottom(self._panel:h() - self._margin)
+	end
 end
 
 function LoadoutImageItem:set_text(text, color_range)
@@ -599,6 +614,7 @@ function LoadoutImageItem:get_outfit_data(type, id)
 		weapon = tweak_data.weapon,
 		melee_weapon = tweak_data.blackmarket.melee_weapons,
 		mask = tweak_data.blackmarket.masks,
+		player_style = tweak_data.blackmarket.player_styles,
 		armor = tweak_data.blackmarket.armors,
 		grenade = tweak_data.blackmarket.projectiles,
 		deployables = tweak_data.blackmarket.deployables,
@@ -608,6 +624,7 @@ function LoadoutImageItem:get_outfit_data(type, id)
 		weapon = "textures/pd2/blackmarket/icons/weapons/",
 		melee_weapon = "textures/pd2/blackmarket/icons/melee_weapons/",
 		mask = "textures/pd2/blackmarket/icons/masks/",
+		player_style = "textures/pd2/blackmarket/icons/player_styles/",
 		armor = "textures/pd2/blackmarket/icons/armors/",
 		grenade = "textures/pd2/blackmarket/icons/grenades/",
 		deployables = "textures/pd2/blackmarket/icons/deployables/",
@@ -763,7 +780,7 @@ function LoadoutPingItem:update(t, dt)
 			end
 			self._next_update_t = (t + 1)
 
-				self:arrange()
+			self:arrange()
 		end
 	end
 end
@@ -775,9 +792,9 @@ function LoadoutPingItem:set_outfit(outfit)
 	else
 		self:set_enabled("peer", false)
 	end
-	end
+end
 
-	function LoadoutPingItem:set_text(text, color)
+function LoadoutPingItem:set_text(text, color)
 	LoadoutPingItem.super.set_text(self, text)
 
 	if alive(self._text) then
@@ -798,7 +815,7 @@ function LoadoutPlaytimeItem:set_outfit(outfit)
 			self:set_text("...")
 			self:arrange()
 
-				--local profile_url = string.format("http://steamcommunity.com/profiles/%s/?xml=1", tostring(steam_id))
+			--local profile_url = string.format("http://steamcommunity.com/profiles/%s/?xml=1", tostring(steam_id))
 			local all_games_url = string.format("http://steamcommunity.com/profiles/%s/games/?xml=1", tostring(steam_id))
 			Steam:http_request(all_games_url, callback(self, self, "set_playtime_clbk"))
 		end
@@ -875,6 +892,7 @@ function LoadoutSkillsItem:set_outfit(outfit)
 			local subtree_amt = math.floor(#skill_data / #self._tree_names)
 			local text = ""
 			local color_range = {}
+			local points_total = 0
 
 			for tree = 1, #self._tree_names, 1 do
 				local tree_has_points = false
@@ -902,7 +920,12 @@ function LoadoutSkillsItem:set_outfit(outfit)
 					end
 					text = string.format("%s%s:%02d ", text, tree_name, tree_sum)
 				end
+				points_total = points_total + tree_sum
 			end
+
+			local is_cheating = points_total > (self:get_max_skillpoints() or points_total)
+			self:set_color(is_cheating and tweak_data.screen_colors.pro_color or self._default_color)
+			self._owner:mark_cheater(is_cheating, is_cheating and "Too many skillpoints used." or "")
 
 			self:set_text(text, color_range)
 
@@ -910,6 +933,27 @@ function LoadoutSkillsItem:set_outfit(outfit)
 		end
 	else
 		self:set_enabled("outfit", false)
+	end
+end
+
+LoadoutSkillsItem.POINTS_MAP = {
+	{1, 1},
+	{10, 2}
+}
+function LoadoutSkillsItem:get_max_skillpoints()
+	local level = 100
+	if managers.experience and self._owner:local_peer() then
+		level = tonumber(managers.experience:current_level())
+	elseif self._owner:get_peer() then
+		level = tonumber(self._owner:get_peer():level())
+	end
+
+	if level then
+		local max_points = 0
+		for _, data in ipairs(self.POINTS_MAP) do
+			max_points = max_points + math.floor(level / data[1]) * data[2]
+		end
+		return max_points
 	end
 end
 
@@ -982,7 +1026,7 @@ function LoadoutWeaponItem:arrange()
 		self._rarity:set_center_y(self._panel:h() / 2 + ((self._text:visible() and self._text:h() or 0) * 0.5))
 	end
 
-		for i, perk in ipairs(self._perks or {}) do
+	for i, perk in ipairs(self._perks or {}) do
 		if alive(perk) and perk:visible() then
 			local size = math.min(self._panel:h() / 4, self._panel:w() / #self._perks, 16)
 			perk:set_w(size)
@@ -1006,28 +1050,30 @@ function LoadoutWeaponItem:set_outfit(outfit)
 end
 
 function LoadoutWeaponItem:set_rarity(texture)
-if texture then
-	self._rarity:set_image(texture)
-	self._rarity:set_visible(true)
-else
-	self._rarity:set_visible(false)
-end
+	if texture then
+		self._rarity:set_image(texture)
+		self._rarity:set_visible(true)
+	else
+		self._rarity:set_visible(false)
+	end
 end
 
 function LoadoutWeaponItem:update_weapon(outfit)
-	local weapon_id = outfit[self._name].cosmetics and outfit[self._name].cosmetics.id or managers.weapon_factory:get_weapon_id_by_factory_id(outfit[self._name].factory_id)
+	local weapon_id = managers.weapon_factory:get_weapon_id_by_factory_id(outfit[self._name].factory_id)
 	if weapon_id then
 		self:set_enabled("outfit", true)
 		if self._loadout ~= weapon_id then
 			self._loadout = weapon_id
-			local skinned = tweak_data.blackmarket.weapon_skins[self._loadout] and true
-			local texture, name, rarity = self:get_outfit_data(skinned and "weapon_skin" or "weapon", self._loadout)
+			local skin_id = outfit[self._name].cosmetics and outfit[self._name].cosmetics.id
+			local skin_tweak = tweak_data.blackmarket.weapon_skins[skin_id]
+			local weapon_skin = skin_tweak and not skin_tweak.is_a_color_skin and (table.contains(skin_tweak.weapon_ids or {}, weapon_id) or (skin_tweak.weapon_id and skin_tweak.weapon_id == weapon_id) ~= (skin_tweak.use_blacklist or false)) or false
+			local texture, name, rarity = self:get_outfit_data(weapon_skin and "weapon_skin" or "weapon", weapon_skin and skin_id or weapon_id)
 
 			self:set_text(name)
 			self:set_image(texture)
 			self:set_rarity(rarity)
 
-				return true
+			return true
 		end
 	else
 		self:set_enabled("outfit", false)
@@ -1046,7 +1092,7 @@ function LoadoutWeaponItem:update_perks(outfit)
 			stats = factory[part_id] and factory[part_id].stats or false
 			custom_stats = factory[part_id] and factory[part_id].custom_stats or false
 			has_stat_boost = stats and 1 < table.size(stats) and true or false
-			has_team_boost = custom_stats and (custom_stats.exp_multiplier or custom_stats.money_multiplier and true) or false
+			has_team_boost = custom_stats and (custom_stats.exp_multiplier or custom_stats.money_multiplier) and true or false
 			if has_stat_boost then
 				perks.bonus_stats = stats
 			end
@@ -1173,7 +1219,7 @@ function LoadoutMeleeItem:set_outfit(outfit)
 		if outfit.melee_weapon == "weapon" then
 			self:set_enabled("outfit", true)
 
-				local loadout_id = outfit.melee_weapon
+			local loadout_id = outfit.melee_weapon
 			local weapon_textures = {}
 			for i, name in ipairs({"primary", "secondary"}) do
 				local weapon_id = outfit[name].cosmetics and outfit[name].cosmetics.id or managers.weapon_factory:get_weapon_id_by_factory_id(outfit[name].factory_id)
@@ -1239,7 +1285,7 @@ end
 LoadoutDeployableItem = LoadoutDeployableItem or class(LoadoutImageItem)
 
 function LoadoutDeployableItem:set_outfit(outfit)
-	if outfit[self._name] and tostring(outfit[self._name]) ~= "nil" and (self._name ~= "secondary_deployable" or (outfit.skills and outfit.skills.skills and tonumber(outfit.skills.skills[7]) >= 12)) then
+	if outfit[self._name] and tostring(outfit[self._name]) ~= "nil" and (self._name ~= "secondary_deployable" or (outfit.skills and outfit.skills.skills and (tonumber(outfit.skills.skills[7]) or 0) >= 12)) then
 		self:set_enabled("outfit", true)
 		if self._loadout ~= outfit[self._name] then
 			self._loadout = outfit[self._name]

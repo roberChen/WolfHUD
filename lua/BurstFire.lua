@@ -31,6 +31,8 @@ if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 	local toggle_firemode_original = NewRaycastWeaponBase.toggle_firemode
 
 	NewRaycastWeaponBase.DEFAULT_BURST_SIZE = 3
+	NewRaycastWeaponBase.IDSTRING_SINGLE = Idstring("single")
+	NewRaycastWeaponBase.IDSTRING_AUTO = Idstring("auto")
 
 	function NewRaycastWeaponBase:_update_stats_values(...)
 		_update_stats_values_original(self, ...)
@@ -86,7 +88,7 @@ if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 	function NewRaycastWeaponBase:fire(...)
 		local result = fire_original(self, ...)
 
-		if not self._is_akimbo and result and self:in_burst_mode() then
+		if result and not self.AKIMBO and self:in_burst_mode() then
 			if self:clip_empty() then
 				self:cancel_burst()
 			else
@@ -108,25 +110,17 @@ if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 
 	function NewRaycastWeaponBase:_check_toggle_burst()
 		if self:in_burst_mode() then
-			self:_set_burst_mode(false, self._is_akimbo and not self._has_auto)
+			self:_set_burst_mode(false, self.AKIMBO and not self._has_auto)
 			return true
 		elseif (self._fire_mode == Idstring("single")) or (self._fire_mode == Idstring("auto") and not self:can_toggle_firemode()) then
-			self:_set_burst_mode(true, self._is_akimbo)
+			self:_set_burst_mode(true, self.AKIMBO)
 			return true
 		end
 	end
 
 	function NewRaycastWeaponBase:_set_burst_mode(status, skip_sound)
 		self._in_burst_mode = status
-		self._fire_mode = Idstring(status and "single" or self._has_auto and "auto" or "single")
-
-		if self._is_akimbo then
-			self._manual_fire_second_gun = not status
-
-			if alive(self._second_gun) then
-				self._second_gun:base():_set_burst_mode(status, skip_sound)
-			end
-		end
+		self._fire_mode = NewRaycastWeaponBase["IDSTRING_" .. (status and "SINGLE" or self._has_auto and "AUTO" or "SINGLE")]
 
 		if not skip_sound then
 			self._sound_fire:post_event((status or self._has_auto) and "wp_auto_switch_on" or "wp_auto_switch_off")
@@ -140,7 +134,7 @@ if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 	end
 
 	function NewRaycastWeaponBase:in_burst_mode()
-		return self._fire_mode == Idstring("single") and self._in_burst_mode and not self:gadget_overrides_weapon_functions()
+		return self._fire_mode == NewRaycastWeaponBase.IDSTRING_SINGLE and self._in_burst_mode and not self:gadget_overrides_weapon_functions()
 	end
 
 	function NewRaycastWeaponBase:burst_rounds_remaining()
@@ -161,6 +155,7 @@ if string.lower(RequiredScript) == "lib/units/weapons/newraycastweaponbase" then
 elseif string.lower(RequiredScript) == "lib/units/weapons/akimboweaponbase" then
 
 	local _update_stats_values_original = AkimboWeaponBase._update_stats_values
+	local fire_original = AkimboWeaponBase.fire
 	local fire_rate_multiplier_original = AkimboWeaponBase.fire_rate_multiplier
 	local toggle_firemode_original = AkimboWeaponBase.toggle_firemode
 
@@ -168,22 +163,59 @@ elseif string.lower(RequiredScript) == "lib/units/weapons/akimboweaponbase" then
 		_update_stats_values_original(self, ...)
 
 		if not self:is_npc() then
-			self._is_akimbo = true
-			self._has_burst_fire = self._has_burst_fire or ((self:weapon_tweak_data().BURST_FIRE ~= false) and (self._fire_mode == Idstring("single")))
-			if self._has_burst_fire then
-				--self._manual_fire_second_gun = self._has_burst_fire
+			self._has_burst_fire = self._has_burst_fire or ((self:weapon_tweak_data().BURST_FIRE ~= false) and (self._fire_mode == NewRaycastWeaponBase.IDSTRING_SINGLE))
+
+			if self:can_use_burst_mode() then
 				self:_set_burst_mode(not self._manual_fire_second_gun, true)
 			end
 		end
 	end
 
+	function AkimboWeaponBase:fire(...)
+		local results = fire_original(self, ...)
+
+		if not self:_in_burst_or_auto_mode() then
+			self._fire_callbacks = {}
+		end
+
+		return results
+	end
+
 	function AkimboWeaponBase:fire_rate_multiplier(...)
-		return fire_rate_multiplier_original(self, ...) * (self._manual_fire_second_gun and 2 or 1)
+		return fire_rate_multiplier_original(self, ...) * (self:_in_burst_or_auto_mode() and 2 or 1)
 	end
 
 	--Override
 	function AkimboWeaponBase:toggle_firemode(...)
-		return self._has_burst_fire and self:_check_toggle_burst() or toggle_firemode_original(self, ...)
+		return self:can_use_burst_mode() and self:_check_toggle_burst() or toggle_firemode_original(self, ...)
+	end
+
+	function AkimboWeaponBase:_set_burst_mode(status, skip_sound)
+		if alive(self._second_gun) then
+			self._second_gun:base():_set_burst_mode(status, skip_sound)
+		end
+
+		return AkimboWeaponBase.super._set_burst_mode(self, status, skip_sound)
+	end
+
+	function AkimboWeaponBase:_in_burst_or_auto_mode()
+		return self._fire_mode == NewRaycastWeaponBase.IDSTRING_AUTO or self:in_burst_mode()
+	end
+
+elseif string.lower(RequiredScript) == "lib/units/weapons/akimboshotgunbase" then
+
+	local _update_stats_values_original = AkimboShotgunBase._update_stats_values
+
+	function AkimboShotgunBase:_update_stats_values(...)
+		_update_stats_values_original(self, ...)
+
+		if not self:is_npc() then
+			self._has_burst_fire = self._has_burst_fire or ((self:weapon_tweak_data().BURST_FIRE ~= false) and (self._fire_mode == NewRaycastWeaponBase.IDSTRING_SINGLE))
+
+			if self._has_burst_fire then
+				self:_set_burst_mode(not self._manual_fire_second_gun, true)
+			end
+		end
 	end
 
 elseif string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandard" then
@@ -243,6 +275,23 @@ elseif string.lower(RequiredScript) == "lib/units/beings/player/states/playersta
 		self._camera_unit:base():recoil_kick(up * recoil_multiplier, down * recoil_multiplier, left * recoil_multiplier, right * recoil_multiplier)
 	end
 
+elseif string.lower(RequiredScript) == "lib/managers/playermanager" then
+
+	local spawned_player_original = PlayerManager.spawned_player
+
+	function PlayerManager:spawned_player(id, unit, ...)
+		spawned_player_original(self, id, unit, ...)
+
+		if unit:key() == self:player_unit():key() then
+			for i = 1, 2, 1 do
+				local wbase = unit:inventory():unit_by_selection(i):base()
+				if wbase:in_burst_mode() then
+					managers.hud:set_teammate_weapon_firemode_burst(i)
+				end
+			end
+		end
+	end
+
 elseif string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 
 	HUDManager._USE_BURST_MODE = true	--Custom HUD compatibility
@@ -254,7 +303,7 @@ elseif string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 elseif string.lower(RequiredScript) == "lib/managers/hud/hudteammate" then
 
 	--Default function for vanilla HUD. If using a custom HUD that alters fire mode HUD components, make sure to implement this function in it
-	HUDTeammate.set_weapon_firemode_burst = HUDTeammate.set_weapon_firemode_burst or function(self, id, firemode, burst_fire)
+	HUDTeammate.set_weapon_firemode_burst = HUDTeammate.set_weapon_firemode_burst or function(self, id)
 		local is_secondary = id == 1
 		local secondary_weapon_panel = self._player_panel:child("weapons_panel"):child("secondary_weapon_panel")
 		local primary_weapon_panel = self._player_panel:child("weapons_panel"):child("primary_weapon_panel")

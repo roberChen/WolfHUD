@@ -3,7 +3,7 @@ Waypoint settings:
 	unit: 					(unit) 		A game unit to tie the waypoint to. If the unit is deleted from the game, the waypoint will be removed. Preference as follows: unit head position, unit interaction positions, unit position
 	position: 				(vector)	A fixed 3D vector position to place the waypoint at
 	offset: 				(vector) 	Offset vector from the Unit/position
-	visible_through_walls:	(boolean)	Option to show/hide Waypoints, if the unit is not visible from the palyers position.
+	visible_through_walls:	(boolean)	Option to show/hide Waypoints, if the unit is not visible from the players position.
 	mask					(various)	Slot mask for the visible_through_walls raycast. Can be a default slot_mask name string or a slotmask directly.
 	show_offscreen: 		(boolean) 	Show this waypoint if it's outside your FOV (default: false)
 	radius_offscreen: 		(number) 	Radius of the circle the waypoint is orbiting on while moving (default: 200)
@@ -515,7 +515,7 @@ if RequiredScript == "lib/setups/setup" then
 		if not self._visible_through_walls then
 			local raycast_position = self._position + self._offset / 2
 			local r = World:raycast( "ray", cam:position(), raycast_position, "slot_mask", self._slot_mask or managers.slot:get_mask( 'explosion_targets'))
-			is_enabled = (not r or not r.unit or self._unit and (self._unit:key() == r.unit:key()))
+			is_enabled = (not r or not r.unit or type(r.unit) ~= "userdata" or self._unit and (self._unit:key() == r.unit:key()))
 		end
 
 		if is_enabled and self._hide_on_uninteractable and self._unit:interaction() then

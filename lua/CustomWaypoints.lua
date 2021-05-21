@@ -4,15 +4,18 @@ if RequiredScript == "lib/managers/hudmanager" then
 
 	function HUDManager:add_waypoint(id, data, ...)
 		add_waypoint_original(self, id, data, ...)
-		if data.distance then
+
+		local wp = self._hud.waypoints[id]
+		if wp and wp.bitmap and wp.distance and wp.arrow and data.distance then
 			local color = WolfHUD:getColorSetting({"CustomWaypoints", "WAYPOINTS_COLOR"}, "white")
-			self._hud.waypoints[id].bitmap:set_color(color)
-			self._hud.waypoints[id].distance:set_color(color)
-			self._hud.waypoints[id].arrow:set_color(color:with_alpha(0.75))
+			wp.bitmap:set_color(color)
+			wp.distance:set_color(color)
+			wp.arrow:set_color(color:with_alpha(0.75))
 		end
 	end
 
 	HUDManager.CUSTOM_WAYPOINTS = {
+		DEBUGGING = false,
 		UPGRADE_COLORS = {
 			[0] = Color.white:with_alpha(0),
 			[1] = Color.white,
@@ -24,12 +27,14 @@ if RequiredScript == "lib/managers/hudmanager" then
 			AUTOREPAIR_COLOR = Color(1, 1, 0, 1),
 			BROKEN_COLOR = Color('FF7575'),
 			ICON_MAP = {
-				drill = "pd2_drill",
-				hack = "pd2_computer",
-				saw = "wp_saw",
-				timer = "pd2_computer",
-				securitylock = "pd2_computer",
-				digital = "pd2_computer",
+				drill 			= "pd2_drill",
+				drill_noupgrade = "pd2_drill",
+				saw 			= "wp_saw",
+				saw_noupgrade 	= "wp_saw",
+				hack 			= "pd2_computer",
+				timer 			= "pd2_computer",
+				securitylock 	= "pd2_computer",
+				digital 		= "pd2_computer",
 			},
 			OVERRIDE_DATA = {
 				[132864] = { class = "MeltdownTemperatureWaypoint" }, 	-- Meltdown Vault Timer
@@ -39,6 +44,25 @@ if RequiredScript == "lib/managers/hudmanager" then
 				[145557] = { ignore = true },							-- Safehouse Killhouse Timer
 				[145676] = { ignore = true },							-- Safehouse Hockeygame Timer
 				[400003] = { ignore = true },							-- Prison Nightmare Big Loot timer
+				[100007] = { ignore = true },							--Cursed kill room timer
+				[100888] = { ignore = true },							--Cursed kill room timer
+				[100889] = { ignore = true },							--Cursed kill room timer
+				[100891] = { ignore = true },							--Cursed kill room timer
+				[100892] = { ignore = true },							--Cursed kill room timer
+				[100878] = { ignore = true },							--Cursed kill room timer
+				[100176] = { ignore = true },							--Cursed kill room timer
+				[100177] = { ignore = true },							--Cursed kill room timer
+				[100029] = { ignore = true },							--Cursed kill room timer
+				[141821] = { ignore = true },							--Cursed kill room safe 1 timer
+				[141822] = { ignore = true },							--Cursed kill room safe 1 timer
+				[140321] = { ignore = true },							--Cursed kill room safe 2 timer
+				[140322] = { ignore = true },							--Cursed kill room safe 2 timer
+				[139821] = { ignore = true },							--Cursed kill room safe 3 timer
+				[139822] = { ignore = true },							--Cursed kill room safe 3 timer
+				[141321] = { ignore = true },							--Cursed kill room safe 4 timer
+				[141322] = { ignore = true },							--Cursed kill room safe 4 timer
+				[140821] = { ignore = true },							--Cursed kill room safe 5 timer
+				[140822] = { ignore = true },							--Cursed kill room safe 5 timer
 			},
 		},
 		EQUIPMENT = {
@@ -84,85 +108,7 @@ if RequiredScript == "lib/managers/hudmanager" then
 				c4_consume_x1 = 					{ std_icon = "equipment_c4", 		x_ray = true, offset = Vector3(0, 0, 0) },
 				--gasoline = 							{ std_icon = "equipment_thermite", 	x_ray = true, offset = Vector3(0, 0, 0) },
 			},
-		},
-		MINIONS = {
-			CHARACTER_NAMES = {
-				[ "civilian" ] 						= { default = "wolfhud_enemy_civilian" },
-				[ "civilian_female" ] 				= { default = "wolfhud_enemy_civilian" },
-				[ "gangster" ] 						= { default = "wolfhud_enemy_gangster" },
-				[ "biker" ] 						= { default = "wolfhud_enemy_biker" },
-				[ "biker_escape" ] 					= { default = "wolfhud_enemy_biker" },
-				[ "bolivian_indoors" ]				= { default = "wolfhud_enemy_bolivian_security" },
-				[ "bolivian" ]						= { default = "wolfhud_enemy_bolivian_thug" },
-				[ "mobster" ] 						= { default = "wolfhud_enemy_mobster" },
-				[ "security" ] 						= { default = "wolfhud_enemy_security" },
-				[ "security_undominatable" ] 		= { default = "wolfhud_enemy_security" },
-				[ "gensec" ] 						= { default = "wolfhud_enemy_gensec" },
-				[ "cop" ] 							= { default = "wolfhud_enemy_cop" },
-				[ "cop_female" ]					= { default = "wolfhud_enemy_cop" },
-				[ "cop_scared" ]					= { default = "wolfhud_enemy_cop" },
-				[ "fbi" ] 							= { default = "wolfhud_enemy_fbi" },
-				[ "swat" ] 							= { default = "wolfhud_enemy_swat" },
-				[ "heavy_swat" ] 					= { default = "wolfhud_enemy_heavy_swat" },
-				[ "fbi_swat" ] 						= { default = "wolfhud_enemy_swat" },
-				[ "fbi_heavy_swat" ] 				= { default = "wolfhud_enemy_heavy_swat" },
-                [ "heavy_swat_sniper" ]             = { default = "wolfhud_enemy_heavy_swat_sniper" },
-				[ "city_swat" ] 					= { default = "wolfhud_enemy_city_swat" },
-				[ "shield" ] 						= { default = "wolfhud_enemy_shield" },
-				[ "spooc" ] 						= { default = "wolfhud_enemy_spook" },
-				[ "taser" ] 						= { default = "wolfhud_enemy_taser" },
-				[ "sniper" ] 						= { default = "wolfhud_enemy_sniper" },
-				[ "medic" ]							= { default = "wolfhud_enemy_medic" },
-				[ "tank" ] 							= { default = "wolfhud_enemy_tank" },
-				[ "tank_hw" ]						= { default = "wolfhud_enemy_tank_hw" },
-				[ "phalanx_minion" ] 				= { default = "wolfhud_enemy_phalanx_minion" },
-				[ "phalanx_vip" ] 					= { default = "wolfhud_enemy_phalanx_vip" },
-				[ "swat_van_turret_module" ] 		= { default = "wolfhud_enemy_swat_van" },
-				[ "ceiling_turret_module" ] 		= { default = "wolfhud_enemy_ceiling_turret" },
-				[ "ceiling_turret_module_no_idle" ] = { default = "wolfhud_enemy_ceiling_turret" },
-				[ "sentry_gun" ]					= { default = "wolfhud_enemy_sentry_gun" },
-				[ "mobster_boss" ] 					= { default = "wolfhud_enemy_mobster_boss" },
-				[ "chavez_boss" ]					= { default = "wolfhud_enemy_chavez_boss" },
-				[ "drug_lord_boss" ]				= { default = "wolfhud_enemy_druglord_boss" },
-				[ "drug_lord_boss_stealth" ]		= { default = "wolfhud_enemy_druglord_boss_stealth" },
-				[ "biker_boss" ] 					= { default = "wolfhud_enemy_biker_boss" },
-				[ "bank_manager" ] 					= { default = "wolfhud_enemy_bank_manager" },
-				[ "inside_man" ] 					= { default = "wolfhud_enemy_inside_man" },
-				[ "escort_undercover" ] 			= { default = "wolfhud_enemy_escort_undercover", run = "wolfhud_enemy_escort_heatstreet" },
-				[ "escort_chinese_prisoner" ]		= { default = "wolfhud_enemy_escort_chinese_prisoner" },
-				[ "drunk_pilot" ] 					= { default = "wolfhud_enemy_drunk_pilot" },
-				[ "escort" ] 						= { default = "wolfhud_enemy_escort" },
-				[ "boris" ]							= { default = "wolfhud_enemy_boris" },
-				[ "spa_vip" ]						= { default = "wolfhud_enemy_spa_vip" },
-				[ "spa_vip_hurt" ]					= { default = "wolfhud_enemy_spa_vip_hurt" },
-				[ "old_hoxton_mission" ] 			= { default = "wolfhud_enemy_locke_mission", hox_1 = "wolfhud_enemy_old_hoxton_mission", hox_2 = "wolfhud_enemy_old_hoxton_mission" },
-				[ "hector_boss" ] 					= { default = "wolfhud_enemy_hector_boss" },
-				[ "hector_boss_no_armor" ] 			= { default = "wolfhud_enemy_hector_boss_no_armor" },
-				[ "robbers_safehouse" ]				= { default = "wolfhud_enemy_crew" },
-				[ "butler" ]						= { default = "wolfhud_enemy_butler" },
-				[ "vlad" ]							= { default = "wolfhud_enemy_vlad" },
-				[ "russian" ] 						= { default = "menu_russian" },
-				[ "german" ] 						= { default = "menu_german" },
-				[ "spanish" ] 						= { default = "menu_spanish" },
-				[ "american" ] 						= { default = "menu_american" },
-				[ "jowi" ] 							= { default = "menu_jowi" },
-				[ "old_hoxton" ] 					= { default = "menu_old_hoxton" },
-				[ "female_1" ] 						= { default = "menu_female_1" },
-				[ "clover" ] 						= { default = "menu_female_1" },
-				[ "dragan" ] 						= { default = "menu_dragan" },
-				[ "jacket" ] 						= { default = "menu_jacket" },
-				[ "bonnie" ] 						= { default = "menu_bonnie" },
-				[ "sokol" ] 						= { default = "menu_sokol" },
-				[ "dragon" ] 						= { default = "menu_dragon" },
-				[ "bodhi" ] 						= { default = "menu_bodhi" },
-				[ "jimmy" ] 						= { default = "menu_jimmy" },
-				[ "sydney" ] 						= { default = "menu_sydney" },
-				[ "wild" ]							= { default = "menu_wild" },
-				[ "chico" ]							= { default = "menu_chico" },
-				[ "terry" ]							= { default = "menu_chico" },
-				[ "max" ]							= { default = "menu_max" },
-			},
-		},
+		}
 	}
 
 	function HUDManager:init(...)
@@ -264,7 +210,12 @@ if RequiredScript == "lib/managers/hudmanager" then
 				show = true,
 				text = text
 			},
-			component_order = { { "icon", "label" } },
+			debug_txt = {
+				type = "label",
+				show = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING,
+				text = string.format("Editor ID: %s", (unit:editor_id() or "N/A")),
+			},
+			component_order = { { "icon", "label" }, { "debug_txt" } },
 		}
 		managers.waypoints:add_waypoint(id, "CustomWaypoint", params)
 	end
@@ -415,7 +366,7 @@ if RequiredScript == "lib/managers/hudmanager" then
 					self:custom_waypoint_ecm_clbk("set_upgrade_level", key, data)
 				end
 			else
-				managers.waypoints:remove_waypoint(id, "jammer_time", "show", false)
+				managers.waypoints:remove_waypoint(id)
 			end
 		elseif managers.waypoints:get_waypoint(id) then
 			if event == "set_jammer_battery" then
@@ -497,7 +448,7 @@ if RequiredScript == "lib/managers/hudmanager" then
 					},
 					debug_txt = {
 						type = "label",
-						show = false,
+						show = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING,
 						text = string.format("Editor ID: %s", (data.unit:editor_id() or "N/A")),
 					},
 					component_order = { { "icon" }, { "timer" }, { "speed_upgrade", "noise_upgrade", "restart_upgrade" }, { "debug_txt" } },
@@ -528,12 +479,12 @@ if RequiredScript == "lib/managers/hudmanager" then
 					managers.waypoints:set_waypoint_setting(id, "color", HUDManager.CUSTOM_WAYPOINTS.TIMER.BROKEN_COLOR)
 					managers.waypoints:set_waypoint_setting(id, "show_offscreen", true)
 				else
-					managers.waypoints:set_waypoint_setting(id, "color", Color('FFFFFF'))
+					managers.waypoints:set_waypoint_setting(id, "color", Color.white)
 					managers.waypoints:set_waypoint_setting(id, "show_offscreen", false)
 				end
 			elseif event == "set_powered" then
 				if data.powered then
-					managers.waypoints:set_waypoint_setting(id, "color", Color('FFFFFF'))
+					managers.waypoints:set_waypoint_setting(id, "color", Color.white)
 					managers.waypoints:set_waypoint_setting(id, "show_offscreen", false)
 				else
 					managers.waypoints:set_waypoint_setting(id, "color", HUDManager.CUSTOM_WAYPOINTS.TIMER.BROKEN_COLOR)
@@ -560,8 +511,6 @@ if RequiredScript == "lib/managers/hudmanager" then
 
 		if event == "add" then
 			local unit_tweak = data.unit:base() and data.unit:base()._tweak_table
-			local name_table = unit_tweak and HUDManager.CUSTOM_WAYPOINTS.MINIONS.CHARACTER_NAMES[unit_tweak]
-			local level_id = managers.job:current_level_id() or ""
 			local params = {
 				unit = data.unit,
 				offset = Vector3(0, 0, 30),
@@ -572,7 +521,7 @@ if RequiredScript == "lib/managers/hudmanager" then
 					show = true,
 					scale = 1.65,
 					texture = "guis/textures/pd2/hud_health",
-					texture_rect = {0, 0, 64, 64},
+					--texture_rect = {0, 0, 64, 64},
 					radial_image = true,
 					color = Color(data.health_ratio or 1, 1, 1),
 				},
@@ -581,7 +530,7 @@ if RequiredScript == "lib/managers/hudmanager" then
 					show = true,
 					scale = 1.65,
 					texture = "guis/textures/pd2/hud_shield",
-					texture_rect = {0, 0, 64, 64},
+					--texture_rect = {0, 0, 64, 64},
 					color = Color.white,
 					alpha = 0.2,
 				},
@@ -590,21 +539,21 @@ if RequiredScript == "lib/managers/hudmanager" then
 					show = true,
 					scale = 1.65,
 					texture = "guis/textures/pd2/hud_radialbg",
-					texture_rect = {0, 0, 64, 64},
+					--texture_rect = {0, 0, 64, 64},
 				},
 				health_dmg = {
 					type = "icon",
 					show = true,
 					scale = 1.65,
 					texture = "guis/textures/pd2/hud_radial_rim",
-					texture_rect = {0, 0, 64, 64},
+					--texture_rect = {0, 0, 64, 64},
 					color = Color.red,
 					alpha = 0,
 				},
 				name = {
 					type = "label",
 					show = true,
-					text = name_table and (managers.localization:to_upper_text(name_table[level_id] or name_table.default)) or "JOKER",
+					text = WolfHUD:getCharacterName(unit_tweak, true)
 				},
 				kills = {
 					type = "label",
@@ -673,18 +622,18 @@ if RequiredScript == "lib/managers/hudmanager" then
 
 		if event == "add" then
 			if tweak_entry and not tweak_entry.is_vehicle and not tweak_entry.skip_exit_secure and (data.carry_id ~= "person" or managers.job:current_level_id() == "mad" and (data.bagged or data.unit:editor_id() ~= -1)) then
+				local angle = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING and 180 or WolfHUD:getSetting({"CustomWaypoints", "LOOT", "ANGLE"}, 25)
 				local name_id = data.carry_id and tweak_data.carry[data.carry_id] and tweak_data.carry[data.carry_id].name_id
 				local bag_name = name_id and managers.localization:to_upper_text(name_id)
 				local count = data.count or 1
-				local angle = WolfHUD:getSetting({"CustomWaypoints", "LOOT", "ANGLE"}, 25)
 				if bag_name then
 					local params = {
 						unit = data.unit,
 						offset = data.bagged and Vector3(0, 0, WolfHUD:getSetting({"CustomWaypoints", "LOOT", "BAGGED_OFFSET"}, 30)) or Vector3(0, 0, WolfHUD:getSetting({"CustomWaypoints", "LOOT", "OFFSET"}, 15)),
-						visible_through_walls = data.bagged,
-						alpha = 0.1,
+						visible_through_walls = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING or data.bagged,
+						alpha = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING and 1 or 0.1,
 						visible_angle = { max = angle },
-						visible_distance = { max = 2000 },
+						visible_distance = { max = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING and 99999 or 2000 },
 						fade_angle = { start_angle = angle, end_angle = angle - 5, final_scale = 8 },
 						scale = 1.25,
 						icon = {
@@ -704,7 +653,12 @@ if RequiredScript == "lib/managers/hudmanager" then
 							show = true,
 							text = bag_name,
 						},
-						component_order = { { "icon", "amount", "label" } },
+						debug_txt = {
+							type = "label",
+							show = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING,
+							text = string.format("Editor ID: %s", (data.unit:editor_id() or "N/A")),
+						},
+						component_order = { { "icon", "amount", "label" }, { "debug_txt" } },
 					}
 
 					managers.waypoints:add_waypoint(id, "CustomWaypoint", params)
@@ -788,12 +742,13 @@ if RequiredScript == "lib/managers/hudmanager" then
 					unit = data.unit,
 					offset = icon_data.offset or Vector3(0, 0, 15),
 					hide_on_uninteractable = true,
-					visible_through_walls = icon_data.x_ray or false,
+					visible_through_walls = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING or icon_data.x_ray or false,
 					scale = 1,
-					alpha = 0.1,
+					alpha = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING and 1 or 0.1,
 					fade_angle = { start_angle = 35, end_angle = 25, final_scale = 8 },
-					visible_angle = { max = 35 },
-					visible_distance = { max = 3000 },
+					visible_angle = { max = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING and 180 or 35 },
+					visible_distance = { max = HUDManager.CUSTOM_WAYPOINTS.DEBUGGING and 99999 or 3000 },
+					color = icon_data.color,
 					icon = {
 						type = "icon",
 						show = true,
