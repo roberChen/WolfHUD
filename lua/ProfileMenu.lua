@@ -45,7 +45,7 @@ if RequiredScript == "lib/managers/menumanager" then
 	local LobbyOptionInitiator_modify_node_orig = LobbyOptionInitiator.modify_node
 	function LobbyOptionInitiator:modify_node(node, ...)
 		local active_menu = managers.menu:active_menu()
-		local briefing_nodes = active_menu.logic and active_menu.logic._data._nodes
+		local briefing_nodes = active_menu and active_menu.logic and active_menu.logic._data._nodes
 		if briefing_nodes and briefing_nodes.kit and not briefing_nodes[PROFILE_MENU_ID] then
 			create_profile_menu_node(briefing_nodes, PROFILE_MENU_ID, true)
 		end
@@ -270,7 +270,10 @@ elseif RequiredScript == "lib/managers/multiprofilemanager" then
 				melee_weapon = profile.melee,
 				grenade = profile.throwable,
 				armor = profile.armor,
+				armor_skin = profile.armor_skin,
 				mask = self:get_item_data("mask", profile.mask),
+				player_style = profile.player_style or managers.blackmarket:get_default_player_style(),
+				suit_variations = (profile.suit_variations or {}),
 				deployable = profile.deployable,
 				secondary_deployable = profile.deployable_secondary,
 				deployable_amount = self:get_deployable_amount(profile.deployable, gd.skills),

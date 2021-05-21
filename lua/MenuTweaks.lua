@@ -1,5 +1,5 @@
 if string.lower(RequiredScript) == "lib/managers/menumanager" then
-	function MenuCallbackHandler:is_dlc_latest_locked(...) return false end
+	function MenuCallbackHandler:get_latest_dlc_locked(...) return false end		--Hide DLC ad in the main menu
 
 	local modify_controls_original = MenuOptionInitiator.modify_controls
 	function MenuOptionInitiator:modify_controls(...)
@@ -7,7 +7,7 @@ if string.lower(RequiredScript) == "lib/managers/menumanager" then
 
 		-- Give sensitivity sliders a step size of 1%.
 		local item
-		for i, name in ipairs({"camera_sensitivity", "camera_sensitivity_horizontal", "camera_sensitivity_vertical", "camera_zoom_sensitivity"}) do
+		for i, name in ipairs({"camera_sensitivity", "camera_sensitivity_horizontal", "camera_sensitivity_vertical", "camera_zoom_sensitivity", "camera_zoom_sensitivity_horizontal", "camera_zoom_sensitivity_vertical"}) do
 			item = new_node:item(name)
 			if item then
 				item:set_step((tweak_data.player.camera.MAX_SENSITIVITY - tweak_data.player.camera.MIN_SENSITIVITY) * 0.01)
@@ -62,6 +62,14 @@ if string.lower(RequiredScript) == "lib/managers/menumanager" then
 		self:save_lobby_settings("difficulty", tweak_data:index_to_difficulty(item:value()))
 	end)
 
+	Hooks:PostHook( MenuCallbackHandler , "choice_crimenet_one_down" , "MenuCallbackHandlerPostSaveOneDownMod_WolfHUD" , function( self, item, ... )
+		self:save_lobby_settings("one_down", item:value() == "on")
+	end)
+
+	Hooks:PostHook( MenuCallbackHandler , "update_matchmake_attributes" , "MenuCallbackHandlerPostUpdateMatchmakeAttributes_WolfHUD" , function( self, item, ... )
+		self:save_lobby_settings()
+	end)
+
 	local WOLFHUD_LOBBY_SETTINGS_LOADED = false
 	local MenuCrimeNetContractInitiator_modify_node_orig = MenuCrimeNetContractInitiator.modify_node
 	function MenuCrimeNetContractInitiator:modify_node(original_node, data, ...)
@@ -78,14 +86,25 @@ if string.lower(RequiredScript) == "lib/managers/menumanager" then
 		if data.customize_contract then
 			data.difficulty = WolfHUD:getSetting({"LOBBY_SETTINGS", "difficulty"}, "normal")
 			data.difficulty_id = tweak_data:difficulty_to_index(data.difficulty)
+			data.one_down = WolfHUD:getSetting({"LOBBY_SETTINGS", "one_down"}, false)
+		end
 
-			local diff_item = original_node:item("difficulty")
+		local results = { MenuCrimeNetContractInitiator_modify_node_orig(self, original_node, data, ...) }
+		local node = table.remove(results, 1)
+		
+		if data.customize_contract then
+			local diff_item = node:item("difficulty")
 			if diff_item then
 				diff_item:set_value(data.difficulty_id)
 			end
-		end
 
-		return MenuCrimeNetContractInitiator_modify_node_orig(self, original_node, data, ...)
+			local od_item = node:item("toggle_one_down")
+			if od_item then
+				od_item:set_value(data.one_down and "on" or "off")
+			end
+		end
+		
+		return node, unpack(results or {})
 	end
 elseif string.lower(RequiredScript) == "lib/managers/menu/blackmarketgui" then
 	--Always enable mod mini icons, put ghost icon behind silent weapon names
@@ -298,10 +317,11 @@ elseif string.lower(RequiredScript) == "lib/managers/menu/blackmarketgui" then
 	function BlackMarketGui:mouse_clicked(...)
 		BlackMarketGui_mouse_clicked_original(self, ...)
 
-		if not self._enabled then
+		if not self._enabled or alive(self._context_panel) then
 			return
 		end
 
+		self._mouse_click = self._mouse_click or {}
 		self._mouse_click[self._mouse_click_index].selected_tab = self._selected
 	end
 
@@ -576,8 +596,10 @@ elseif string.lower(RequiredScript) == "core/lib/managers/menu/items/coremenuite
 	function ItemSlider:reload(row_item, ...)
 		local val = reload_original(self, row_item, ...)
 
-		row_item.gui_text:set_color(row_item.color)
-		row_item.gui_slider_text:set_color(row_item.color)
+		if row_item and row_item.color then
+			row_item.gui_text:set_color(row_item.color)
+			row_item.gui_slider_text:set_color(row_item.color)
+		end
 
 		return val
 	end
@@ -610,9 +632,10 @@ elseif string.lower(RequiredScript) == "lib/managers/menu/stageendscreengui" the
 		update_original(self, t, ...)
 		if not self._button_not_clickable and SKIP_STAT_SCREEN_DELAY > 0 then
 			self._auto_continue_t = self._auto_continue_t or (t + SKIP_STAT_SCREEN_DELAY)
-			if t >= self._auto_continue_t then
+			local gsm = game_state_machine:current_state()
+			if gsm and gsm._continue_cb and not (gsm._continue_blocked and gsm:_continue_blocked()) and t >= self._auto_continue_t then
 				managers.menu_component:post_event("menu_enter")
-				game_state_machine:current_state()._continue_cb()
+				gsm._continue_cb()
 			end
 		end
 	end
@@ -631,18 +654,24 @@ elseif string.lower(RequiredScript) == "lib/managers/menu/stageendscreengui" the
 elseif string.lower(RequiredScript) == "lib/managers/menu/lootdropscreengui" then
 	local SKIP_LOOT_SCREEN_DELAY = WolfHUD:getSetting({"SkipIt", "LOOT_SCREEN_DELAY"}, 3)
 	local AUTO_PICK_CARD = WolfHUD:getSetting({"SkipIt", "AUTOPICK_CARD"}, true)
+	local AUTO_PICK_SPECIFIC_CARD = WolfHUD:getSetting({"SkipIt", "AUTOPICK_CARD_SPECIFIC"}, 1)
 	local update_original = LootDropScreenGui.update
 	function LootDropScreenGui:update(t, ...)
 		update_original(self, t, ...)
 
 		if not self._card_chosen and AUTO_PICK_CARD then
-			self:_set_selected_and_sync(math.random(3))
+			local autopicked_card = AUTO_PICK_SPECIFIC_CARD
+			if autopicked_card == 4 then
+				autopicked_card = math.random(3)
+			end
+			self:_set_selected_and_sync(autopicked_card)
 			self:confirm_pressed()
 		end
 
 		if not self._button_not_clickable and SKIP_LOOT_SCREEN_DELAY > 0 then
 			self._auto_continue_t = self._auto_continue_t or (t + SKIP_LOOT_SCREEN_DELAY)
-			if t >= self._auto_continue_t then
+			local gsm = game_state_machine:current_state()
+			if gsm and not (gsm._continue_blocked and gsm:_continue_blocked()) and t >= self._auto_continue_t then
 				self:continue_to_lobby()
 			end
 		end
@@ -653,7 +682,7 @@ elseif string.lower(RequiredScript) == "lib/managers/menu/contractboxgui" then
 	function ContractBoxGui:create_character_text(peer_id, ...)
 		create_character_text_original(self, peer_id, ...)
 
-		if WolfHUD:getSetting({"CustomHUD", "TEAMMATE", "LATENCY"}, 3) and  managers.network:session() then
+		if managers.network:session() then
 			if managers.network:session():local_peer():id() ~= peer_id then
 				local peer_label = self._peers[peer_id]
 				if alive(peer_label) then

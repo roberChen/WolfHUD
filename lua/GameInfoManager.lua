@@ -1,20 +1,7 @@
 --TODO: Fix Client Minion Damage upgrade sync (line: 1919)
-local print_info = function(...)
-	local params = {...}
-	table.insert(params, #params + 1, "info")
-	WolfHUD:print_log(unpack(params))
-end
-
-local print_warning = function(...)
-	local params = {...}
-	table.insert(params, #params + 1, "warning")
-	WolfHUD:print_log(unpack(params))
-end
-
-local print_error = function(...)
-	local params = {...}
-	table.insert(params, #params + 1, "error")
-	WolfHUD:print_log(unpack(params))
+local print_debug = function(text, ...)
+	text = string.format("(GameInfo) %s", tostring(text))
+	WolfHUD:print_log(text, ...)
 end
 
 if string.lower(RequiredScript) == "lib/setups/setup" then
@@ -88,9 +75,23 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 					managers.gameinfo:_listener_callback("timer", "set_powered", key, timers[key])
 				end
 			end,
-			set_upgradable = function(timers, key, status)
-				if timers[key] and timers[key].upgradable ~= status then
-					timers[key].upgradable = status
+			-- Only securitylocks
+			set_current_bar = function(timers, key, current_bar)
+				if timers[key] and timers[key].current_bar ~= current_bar then
+					timers[key].current_bar = current_bar
+					managers.gameinfo:_listener_callback("timer", "set_current_bar", key, timers[key])
+				end
+			end,
+			set_total_bars = function(timers, key, total_bars)
+				if timers[key] and timers[key].total_bars ~= total_bars then
+					timers[key].total_bars = total_bars
+					managers.gameinfo:_listener_callback("timer", "set_total_bars", key, timers[key])
+				end
+			end,
+			-- Only upgradable drills/saws
+			set_upgradable = function(timers, key, upgradable)
+				if timers[key] and timers[key].upgradable ~= upgradable then
+					timers[key].upgradable = upgradable
 					managers.gameinfo:_listener_callback("timer", "set_upgradable", key, timers[key])
 				end
 			end,
@@ -101,7 +102,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				end
 			end,
 			set_autorepair = function(timers, key, auto_repair)
-				if timers[key] then
+				if timers[key] and timers[key].auto_repair ~= auto_repair then
 					timers[key].auto_repair = auto_repair
 					managers.gameinfo:_listener_callback("timer", "set_autorepair", key, timers[key])
 				end
@@ -142,7 +143,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			[130322] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_loud_pause(...) end },	--Train heist vaults
 			[130422] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_loud_pause(...) end },	--Train heist vaults
 			[130522] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_loud_pause(...) end },	--Train heist vaults
-			[145557] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end } -- Safehouse Killhouse Timer
+			[145557] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end }, -- Safehouse Killhouse Timer
 			--[130320] = { },	--The Diamond outer time lock
 			--[130395] = { },	--The Diamond inner time lock
 			--[101457] = { },	--Big Bank time lock door #1
@@ -152,6 +153,21 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			--[135076] = { },	--Lab rats cloaker safe 2
 			--[135246] = { },	--Lab rats cloaker safe 3
 			--[135247] = { },	--Lab rats cloaker safe 4
+			[141821] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 1 timer
+			[141822] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 1 timer
+			[141823] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 1 timer
+			[140321] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 2 timer
+			[140322] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 2 timer
+			[140323] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 2 timer
+			[139821] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 3 timer
+			[139822] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 3 timer
+			[139823] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 3 timer
+			[141321] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 4 timer
+			[141322] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 4 timer
+			[141323] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 4 timer
+			[140821] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 5 timer
+			[140822] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 5 timer
+			[140823] = { pause = function(...) GameInfoManager._TIMER_CALLBACKS.overrides.stop_on_pause(...) end },	--Cursed kill room safe 5 timer
 		}
 	}
 
@@ -191,34 +207,42 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			diamond_pickup_pal = 				"_special_equipment_interaction_handler",	-- Small loot
 			ring_band = 						"_special_equipment_interaction_handler",	-- BoS Rings
 			safe_loot_pickup = 					"_special_equipment_interaction_handler",	-- Small loot
+			diamond_pickup_axis = 				"_special_equipment_interaction_handler",	-- Small loot, Diamond heist
 			press_pick_up =						"_special_equipment_interaction_handler",	-- Biker Bottle
 			hold_take_missing_animal_poster = 	"_special_equipment_interaction_handler",	-- Heat Streat Posters
 			hold_pick_up_turtle = 				"_special_equipment_interaction_handler",	-- Heat Street Tutle
+			diamond_single_pickup_axis = 		"_special_equipment_interaction_handler",
 			glc_hold_take_handcuffs = 			"_special_equipment_interaction_handler",	-- Green Bridge Handcuffs
 			pickup_tablet = 					"_special_equipment_interaction_handler",	-- Stealing Xmas Tablet
 			pickup_phone = 						"_special_equipment_interaction_handler",	-- Stealing Xmas Phone
+			press_take_folder = 				"_special_equipment_interaction_handler",
+			take_jfr_briefcase = 				"_special_equipment_interaction_handler",
+			take_confidential_folder_icc = 		"_special_equipment_interaction_handler",
 			firstaid_box =						"_deployable_interaction_handler",
 			ammo_bag =							"_deployable_interaction_handler",
 			doctor_bag =						"_deployable_interaction_handler",
 			first_aid_kit = 					"_deployable_interaction_handler",
 			bodybags_bag =						"_deployable_interaction_handler",
 			grenade_crate =						"_deployable_interaction_handler",
-
-			pku_scubagear_vest = 				"_special_equipment_interaction_handler",	--TMP: Where is this used...?
-			pku_scubagear_tank = 				"_special_equipment_interaction_handler",	--TMP: Where is this used...?
+			--grenade_briefcase =					"_deployable_interaction_handler",		-- Thermal Paste uses this interaction as well... :(
 		},
 		INTERACTION_TO_CARRY = {
-			weapon_case =				"weapon",
-			weapon_case_axis_z =		"weapon",
-			samurai_armor =				"samurai_suit",
-			gen_pku_warhead_box =		"warhead",
-			pku_toothbrush = 			"toothbrush",
-			corpse_dispose =			"person",
-			crate_loot = 				"crate",
-			crate_loot_crowbar = 		"crate",
-			crate_weapon_crowbar = 		"crate",
-			hold_open_xmas_present = 	"xmas_present",
-			hold_open_case =			"drone_control_helmet",	--May be reused in future heists for other loot
+			weapon_case =					"weapon",
+			weapon_case_axis_z =			"weapon",
+			samurai_armor =					"samurai_suit",
+			gen_pku_warhead_box =			"warhead",
+			pku_toothbrush = 				"toothbrush",
+			corpse_dispose =				"person",
+			crate_loot = 					"crate",
+			crate_loot_crowbar = 			"crate",
+			crate_weapon_crowbar = 			"crate",
+			hold_open_xmas_present = 		"xmas_present",
+			hold_open_case =				"drone_control_helmet",	--May be reused in future heists for other loot
+
+			cut_glass = 					"showcase",
+			diamonds_pickup = 				"diamonds_dah",
+			red_diamond_pickup = 			"red_diamond",
+			red_diamond_pickup_no_axis = 	"red_diamond",
 
 			hold_open_shopping_bag = 		"shopping_bag",
 			hold_take_toy = 				"robot_toy",
@@ -227,6 +251,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			hold_take_diamond_necklace =	"diamond_necklace",
 			hold_take_vr_headset = 			"vr_headset",
 			hold_take_shoes = 				"women_shoes",
+			hold_take_old_wine = 			"old_wine",
 		},
 		BAGGED_IDS = {
 			painting_carry_drop = true,
@@ -248,43 +273,50 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			end,
 		},
 		CONDITIONAL_IGNORE_IDS = {
-			ff3_vault = function(wall_id)
+			ff3_vault = function(...)
 				if managers.job:current_level_id() == "framing_frame_3" then
+					local wall_ids = { ... }
 					for _, unit in pairs(World:find_units_quick("all", 1)) do
-						if unit:editor_id() == wall_id then
+						if table.contains(wall_ids, tonumber(unit:editor_id())) then
 							return true
 						end
 					end
 				end
 			end,
 
+--[[ 		Vault_Door	closed_Wall		wine_Wall
+upstairs	100476		101423			105879
+bedroom		100490		101431			105876
+lounge		100421		100448			102049
+]]
+
 			--FF3 lounge vault
-			[100548] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100549] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100550] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100551] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100552] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100553] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100554] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
-			[100555] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448) end,
+			[100548] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100549] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100550] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100551] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100552] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100553] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100554] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
+			[100555] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(100448, 102049) end,
 			--FF3 bedroom vault
-			[100556] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100557] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100558] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100559] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100560] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100561] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100562] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
-			[100563] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431) end,
+			[100556] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100557] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100558] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100559] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100560] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100561] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100562] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
+			[100563] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101431, 105876) end,
 			--FF3 upstairs vault
-			[100564] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100566] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100567] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100568] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100569] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100570] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100571] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
-			[100572] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423) end,
+			[100564] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100566] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100567] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100568] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100569] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100570] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100571] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
+			[100572] = function() return GameInfoManager._INTERACTIONS.CONDITIONAL_IGNORE_IDS.ff3_vault(101423, 105879) end,
 		},
 		IGNORE_IDS = {
 			watchdogs_2 = {	--Watchdogs day 2 (8x coke)
@@ -330,9 +362,13 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				[102052] = true,
 				[102402] = true,
 			},
-			chill_combat = { -- Ammo shelves
+			chill = {	-- Custom Safehouse (1x Painting)
+				[150416] = true
+			},
+			chill_combat = { -- Safehouse Raid (2x Ammo shelves, 1x Painting)
 				[100751] = true,
 				[101242] = true,
+				[150416] = true
 			},
 			short2_stage1 = {	-- Keycard
 				[104102] = true,
@@ -340,6 +376,66 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			fish = {	--Yacht (1x artifact painting)
 				[500533] = true,
 			},
+			dah = {	-- The Diamond Heist (1x Red Diamond Showcase)
+				[100952] = true,
+			},
+			rvd2 = { -- Resevoir Dogs (1x money, 4x Small loot)
+				[100296] = true,
+				[100277] = true,
+				[100278] = true,
+				[100279] = true,
+				[100280] = true,
+			},
+			des = { -- Henry's Rock (2x artifact, 2x painting)
+				[101757] = true,
+				[400513] = true,
+				[400515] = true,
+				[400617] = true,
+			},
+			tag = {	-- Breakin' Feds (1x evidence)
+				[134563] = true,
+			},
+			sah = {	-- Shacklethorne Auction (2x artifact, 1x grenades)
+				[400791] = true,
+				[400792] = true,
+				[400178] = true,
+			},
+			skm_run = { -- Heat Street Holdout (3x posters)
+				[103636] = true,
+				[103640] = true,
+				[600479] = true,
+			},
+			skm_watchdogs_stage2 = { -- Watch Dogs Holdout (10x coke)
+				[132355] = true,
+				[100495] = true,
+				[132565] = true,
+				[132037] = true,
+				[132042] = true,
+				[132337] = true,
+				[131842] = true,
+				[100492] = true,
+				[132365] = true,
+				[100429] = true,
+				[131855] = true,
+				[100494] = true,
+				[100491] = true,
+				[132055] = true,
+				[132542] = true,
+				[131837] = true,
+				[100427] = true,
+				[132555] = true,
+				[100054] = true,
+				[131865] = true,
+				[132342] = true,
+				[100428] = true,
+				[132065] = true,
+				[100426] = true,
+				[132537] = true,
+				[100058] = true,
+			},
+			mex_cooking = { -- Border Crystals (4x Roman Armor)
+				roman_armor = true,
+			}
 		},
 	}
 	GameInfoManager._INTERACTIONS.IGNORE_IDS.watchdogs_2_day = table.deep_map_copy(GameInfoManager._INTERACTIONS.IGNORE_IDS.watchdogs_2)
@@ -348,6 +444,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 	GameInfoManager._CAMERAS = {
 		["6c5d032fe7e08d01"] = "standard",	--units/payday2/equipment/gen_equipment_security_camera/gen_equipment_security_camera
 		["0c721a9fa6d2fe0a"] = "standard",	--units/world/props/security_camera/security_camera
+		["c64ffaefb39415bc"] = "standard",	--units/world/props/security_camera/security_camera_white
 		["490a9313f945cccf"] = "drone",		--units/pd2_dlc_dark/equipment/gen_drone_camera/gen_drone_camera
 	}
 
@@ -365,10 +462,15 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			first_aid_kit = 					"first_aid_kit",
 			bodybags_bag =						"body_bag",
 			grenade_crate =						"grenade_crate",
+			--grenade_briefcase =					"grenade_crate",
+		},
+		INTERACTON_ID_ALLOW_CREATE = {
+			--grenade_briefcase =	true,
 		},
 		AMOUNT_OFFSETS = {
 			--interaction_id or editor_id
 			firstaid_box = -1,	--GGC drill asset, HB infirmary
+			--grenade_briefcase = 3,
 		},
 		AGGREAGATE_ITEMS = {	-- [type] or [level_id + editor_id]
 			["first_aid_kit"] = "first_aid_kits",	-- Aggregate all FAKs
@@ -421,8 +523,16 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 
 	GameInfoManager._UNITS = {
 		TWEAK_ID_BY_NAME = {
-			[tostring(Idstring("units/pd2_dlc_born/characters/npc_male_mechanic/npc_male_mechanic"))] = "mechanic",
-			[tostring(Idstring("units/pd2_dlc_born/characters/npc_male_mechanic/npc_male_mechanic_husk"))] = "mechanic"
+			[tostring(Idstring("units/pd2_dlc_born/characters/npc_male_mechanic/npc_male_mechanic"))] 										= "mechanic",
+			[tostring(Idstring("units/pd2_dlc_born/characters/npc_male_mechanic/npc_male_mechanic_husk"))] 									= "mechanic",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_male_bank_manager_hostage/civ_male_bank_manager_hostage"))] 				= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_male_bank_manager_hostage/civ_male_bank_manager_hostage_husk"))] 			= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_female_museum_curator_hostage/civ_female_museum_curator_hostage"))] 		= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_female_museum_curator_hostage/civ_female_museum_curator_hostage_husk"))] 	= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_female_drug_lord_hostage/civ_female_drug_lord_hostage"))] 				= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_female_drug_lord_hostage/civ_female_drug_lord_hostage_husk"))] 			= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_male_prisoner_hostage/civ_male_prisoner_hostage"))] 						= "civ_hostage",
+			[tostring(Idstring("units/pd2_skirmish/characters/civ_male_prisoner_hostage/civ_male_prisoner_hostage_husk"))] 					= "civ_hostage",
 		}
 	}
 
@@ -473,6 +583,8 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			loose_ammo_give_team = "ammo_give_out_debuff",
 			armor_break_invulnerable = "armor_break_invulnerable_debuff",
 			single_shot_fast_reload = "aggressive_reload_aced",
+            unseen_strike = "unseen_strike",
+			pocket_ecm_kill_dodge =	"pocket_ecm_kill_dodge",
 
 			--"properties"
 			bloodthirst_reload_speed = "bloodthirst_aced",
@@ -562,6 +674,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		while self._scheduled_callbacks[1] and self._scheduled_callbacks[1].t <= t do
 			local data = table.remove(self._scheduled_callbacks, 1)
 			data.clbk(unpack(data.args))
+			print_debug("Executed scheduled callback: %s", data.id, "info")
 		end
 	end
 
@@ -575,6 +688,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		end
 
 		table.insert(self._scheduled_callbacks, pos, { id = id, t = t, clbk = clbk, args = { ... } })
+		print_debug("Added scheduled callback: %s", id, "info")
 	end
 
 	function GameInfoManager:remove_scheduled_callback(id)
@@ -582,6 +696,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			if data.id == id then
 				table.remove(self._scheduled_callbacks, i)
 				i = i - 1
+				print_debug("Removed scheduled callback: %s", id, "info")
 			end
 		end
 	end
@@ -592,7 +707,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		if self[target] then
 			self[target](self, ...)
 		else
-			print_warning("(GameInfo) No event handler for %s", target)
+			print_debug("No event handler for %s", target, "error")
 		end
 	end
 
@@ -823,7 +938,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		local lookup = GameInfoManager._INTERACTIONS
 		local level_id = managers.job:current_level_id()
 
-		if lookup.IGNORE_IDS[level_id] and lookup.IGNORE_IDS[level_id][data.editor_id] then
+		if lookup.IGNORE_IDS[level_id] and (lookup.IGNORE_IDS[level_id][data.editor_id] or lookup.IGNORE_IDS[level_id][data.interact_id]) then
 			return
 		end
 
@@ -841,7 +956,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			local carry_id = data.unit:carry_data() and data.unit:carry_data():carry_id() or lookup.INTERACTION_TO_CARRY[data.interact_id] or (self._loot[key] and self._loot[key].carry_id)
 
 			if carry_id then
-				print_info("(GameInfo) %s - %s: %d", event, carry_id, data.editor_id)
+				print_debug("Loot Interaction: %s - %s (%d)", event, carry_id, data.editor_id, "info")
 				data.carry_id = carry_id
 				self:_loot_interaction_handler(event, key, data)
 			else
@@ -891,7 +1006,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				self:_listener_callback("camera", event, key, self._cameras[key])
 
 				if not type then
-					print_warning("UNKNOWN CAMERA UNIT TYPE: %s", tostring(data.unit:name():key()))
+					print_debug("UNKNOWN CAMERA UNIT TYPE: %s", tostring(data.unit:name():key()), "warning")
 				end
 			end
 		elseif self._cameras[key] then
@@ -955,9 +1070,17 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 
 	function GameInfoManager:_deployable_interaction_handler(event, key, data)
 		local type = GameInfoManager._EQUIPMENT.INTERACTION_ID_TO_TYPE[data.interact_id]
+		local active = event == "add" or event == "interact"
+
+		if not self._deployables[type][key] and GameInfoManager._EQUIPMENT.INTERACTON_ID_ALLOW_CREATE[data.interact_id] then
+			if active then
+				self:_bag_deployable_event("create", key, { unit = data.unit }, type)
+			else
+				self:_bag_deployable_event("destroy", key, {}, type)
+			end
+		end
 
 		if self._deployables[type][key] then
-			local active = event == "add" or event == "interact"
 			local offset = GameInfoManager._EQUIPMENT.AMOUNT_OFFSETS[data.unit:editor_id()] or GameInfoManager._EQUIPMENT.AMOUNT_OFFSETS[data.interact_id]
 
 			self:_bag_deployable_event("set_active", key, { active = active }, type)
@@ -1111,14 +1234,14 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 
 				self._deployables[type][aggregate_key][attr] = total
 				self:_listener_callback(type, "set_" .. attr, aggregate_key, self._deployables[type][aggregate_key])
-				print_info("(GameInfo) UPDATE AGGREGATE %s: %s", tostring(attr), tostring(total))
+				print_debug("UPDATE AGGREGATE %s: %s", tostring(attr), tostring(total), "info")
 			end
 
 			local lookup = GameInfoManager._EQUIPMENT.AGGREAGATE_ITEMS
 			local level_id = managers.job:current_level_id() or ""
 			local editor_id = self._deployables[type][key].unit:editor_id()
 			local aggregate_key = lookup[type] or lookup[level_id] and lookup[level_id][editor_id]
-			print_info("(GameInfo) %s | %s", type, self._deployables[type][key].unit:editor_id())
+			print_debug("_bag_deployable_event: %s | %s", type, self._deployables[type][key].unit:editor_id(), "info")
 			if event == "destroy" then
 				self:_listener_callback(type, "destroy", key, self._deployables[type][key])
 				self._deployables[type][key] = nil
@@ -1203,7 +1326,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 	end
 
 	function GameInfoManager:_sentry_event(event, key, data)
-		print_info("GameInfoManager:_sentry_event(%s, %s)", event, key)
+		print_debug("_sentry_event(%s, %s)", event, key, "info")
 
 		if event == "create" then
 			local sentry_type = data.unit:base() and data.unit:base():get_type() or ""
@@ -1248,7 +1371,7 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				self:_buff_event("set_value", id, { value = data.value })
 			end
 		else
-			print_info("Unknown temporary buff event: %s, %s, %s", tostring(event), tostring(data.category), tostring(data.upgrade))
+			print_debug("Unknown temporary buff event: %s, %s, %s", tostring(event), tostring(data.category), tostring(data.upgrade), "warning")
 		end
 	end
 
@@ -1257,14 +1380,24 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 
 		if event == "activate" then
 			self:_buff_event("set_duration", id, { t = data.t, duration = data.duration, expire_t = data.expire_t })
-			self:_add_player_timer_expiration(id, id, self._buffs[id].expire_t, self._timed_buff_expire_clbk)
+            if data.expire_t or (data.t and data.duration) then
+                self:_add_player_timer_expiration(id, id, data.expire_t or (data.t + data.duration), self._timed_buff_expire_clbk)
+            end
 		elseif event == "deactivate" then
 			self:_remove_player_timer_expiration(id)
+		elseif self._buffs[id] then
+			if event == "set_expire" then
+				self:_remove_player_timer_expiration(id)
+				self:_add_player_timer_expiration(id, id, self._buffs[id].expire_t, self._timed_buff_expire_clbk)
+			elseif event == "change_expire" then
+				self:_remove_player_timer_expiration(id)
+				self:_add_player_timer_expiration(id, id, self._buffs[id].expire_t, self._timed_buff_expire_clbk)
+			end
 		end
 	end
 
 	function GameInfoManager:_timed_stack_buff_event(event, id, data)
-		print_info("GameInfoManager:_timed_stack_buff_event(%s, %s)", tostring(event), tostring(id))
+		print_debug("_timed_stack_buff_event(%s, %s)", tostring(event), tostring(id), "info")
 
 		if event == "add_stack" then
 			if not self._buffs[id] then
@@ -1281,14 +1414,14 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				i = i - 1
 			end
 			table.insert(self._buffs[id].stacks, i + 1, { key = key, t = t, expire_t = expire_t })
-			self:_add_player_timer_expiration(key, id, expire_t, self._timed_stack_expire_clbk)
 
 			self:_listener_callback("buff", "add_timed_stack", id, self._buffs[id])
+			self:_add_player_timer_expiration(key, id, expire_t, self._timed_stack_expire_clbk)
 		end
 	end
 
 	function GameInfoManager:_buff_event(event, id, data)
-		print_info("GameInfoManager:_buff_event(%s, %s)", tostring(event), tostring(id))
+		print_debug("_buff_event(%s, %s)", tostring(event), tostring(id), "info")
 
 		if event == "activate" then
 			if not self._buffs[id] then
@@ -1307,17 +1440,21 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			elseif event == "set_stack_count" then
 				self._buffs[id].stack_count = data.stack_count
 			elseif event == "change_stack_count" then
-				self._buffs[id].stack_count = (self._buffs[id].stack_count or 0) + data.difference
-				event = "set_stack_count"
+				return self:_buff_event("set_stack_count", id, { stack_count = (self._buffs[id].stack_count or 0) + data.difference })
+			elseif event == "increment_stack_count" then
+				return self:_buff_event("set_stack_count", id, { stack_count = (self._buffs[id].stack_count or 0) + 1 })
+			elseif event == "decrement_stack_count" then
+				return self:_buff_event("set_stack_count", id, { stack_count = (self._buffs[id].stack_count or 0) - 1 })
 			elseif event == "set_progress" then
 				self._buffs[id].progress = data.progress
 			elseif event == "set_value" then
 				self._buffs[id].value = data.value
-			elseif event == "decrease_duration" then
-				self._buffs[id].expire_t = self._buffs[id].expire_t - data.decrease
-				event = "set_duration"
-				self:_remove_player_timer_expiration(id)
-				self:_add_player_timer_expiration(id, id, self._buffs[id].expire_t, self._timed_buff_expire_clbk)
+			elseif event == "set_expire" then
+				local expire_t = data.duration and (data.duration + Application:time()) or data.expire_t
+				return self:_buff_event("set_duration", id, { t = self._buffs[id].t, expire_t = expire_t })
+			elseif event == "change_expire" then
+				local expire_t = data.difference and (self._buffs[id].expire_t + data.difference) or data.expire_t
+				return self:_buff_event("set_duration", id, { t = self._buffs[id].t, expire_t = expire_t })
 			end
 		else
 			return
@@ -1365,12 +1502,12 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				end
 			end
 		else
-			print_info("Unknown team buff event: %s, %s, %s", event, data.category, data.upgrade)
+			print_debug("Unknown team buff event: %s, %s, %s", event, data.category, data.upgrade, "warning")
 		end
 	end
 
 	function GameInfoManager:_player_action_event(event, id, data)
-		print_info("GameInfoManager:_player_action_event(%s, %s)", tostring(event), tostring(id))
+		print_debug("_player_action_event(%s, %s)", tostring(event), tostring(id), "info")
 
 		if event == "activate" then
 			if not self._player_actions[id] then
@@ -1391,6 +1528,12 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 				local expire_t = data.expire_t or data.duration and (data.duration + t) or t
 				self._player_actions[id].t = t
 				self._player_actions[id].expire_t = expire_t
+			elseif event == "set_expire" then
+				local expire_t = data.duration and (data.duration + Application:time()) or data.expire_t
+				return self:_player_action_event("set_duration", id, { t = self._player_actions[id].t, expire_t = expire_t })
+			elseif event == "change_expire" then
+				local expire_t = data.difference and (self._player_actions[id].expire_t + data.difference) or data.expire_t
+				return self:_player_action_event("set_duration", id, { t = self._player_actions[id].t, expire_t = expire_t })
 			elseif event == "set_data" then
 				self._player_actions[id].data = self._player_actions[id].data or {}
 				for k, v in pairs(data) do
@@ -1442,21 +1585,26 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 			self:_remove_player_timer_expiration(key)
 		end
 
-		local expire_data = { key = key, id = id, expire_t = expire_t }
-		local t_size = #self._auto_expire_timers.expire_t
-
-		if (t_size <= 0) or (expire_t >= self._auto_expire_timers.expire_t[t_size].expire_t) then
-			table.insert(self._auto_expire_timers.expire_t, expire_data)
+		local t = Application:time()
+		if expire_t <= t then
+			expire_clbk(t, key, id)
 		else
-			for i = 1, t_size, 1 do
-				if expire_t < self._auto_expire_timers.expire_t[i].expire_t then
-					table.insert(self._auto_expire_timers.expire_t, i, expire_data)
-					break
+			local expire_data = { key = key, id = id, expire_t = expire_t }
+			local t_size = #self._auto_expire_timers.expire_t
+
+			if (t_size <= 0) or (expire_t >= self._auto_expire_timers.expire_t[t_size].expire_t) then
+				table.insert(self._auto_expire_timers.expire_t, expire_data)
+			else
+				for i = 1, t_size, 1 do
+					if expire_t < self._auto_expire_timers.expire_t[i].expire_t then
+						table.insert(self._auto_expire_timers.expire_t, i, expire_data)
+						break
+					end
 				end
 			end
-		end
 
-		self._auto_expire_timers.on_expire[key] = expire_clbk
+			self._auto_expire_timers.on_expire[key] = expire_clbk
+		end
 	end
 
 	function GameInfoManager:_remove_player_timer_expiration(key)
@@ -1509,12 +1657,13 @@ if string.lower(RequiredScript) == "lib/setups/setup" then
 		local count = 0
 
 		for key, cam_data in pairs(self._cameras) do
-			if cam_data.enabled ~= false and (cam_data.active or Network:is_client()) then	-- Ukrainian Job never sets cams 'enabled', only 'active' if guard in front of console. GO Bank sets both flags.
-				print_info("Camera (%s): Drone:%s Enabled:%s Active:%s Broken:%s Loop:%s", key, tostring(cam_data.is_drone), tostring(cam_data.enabled), tostring(cam_data.active), tostring(cam_data.brokene), tostring(cam_data.tape_loop_expire_t and cam_data.tape_loop_expire_t > Application:time() and true or false))
-			end
+			if cam_data.enabled ~= false and (cam_data.active or Network:is_client()) then
+				local id = cam_data.unit and cam_data.unit:editor_id() or key
+				print_debug("Camera (%s): Drone:%s Enabled:%s Active:%s Broken:%s Loop:%s", id, tostring(cam_data.is_drone), tostring(cam_data.enabled), tostring(cam_data.active), tostring(cam_data.broken), tostring(cam_data.tape_loop_expire_t and cam_data.tape_loop_expire_t > Application:time() and string.format("%.2f", cam_data.tape_loop_expire_t - Application:time()) or false), "info")
 
-			if cam_data.enabled ~= false and (cam_data.active or Network:is_client()) and not cam_data.broken then
-				count = count + 1
+				if not cam_data.broken then
+					count = count + 1
+				end
 			end
 		end
 
@@ -1656,8 +1805,8 @@ if string.lower(RequiredScript) == "lib/units/props/timergui" then
 	end
 
 	function TimerGui:set_background_icons(...)
-		local skills = self._unit:base().get_skill_upgrades and self._unit:base():get_skill_upgrades()
 		if not self._unit:base()._disable_upgrades then
+			local skills = self._unit:base().get_skill_upgrades and self._unit:base():get_skill_upgrades()
 			local player_skills = Drill.get_upgrades(self._unit, nil)
 			local function player_can_upgrade(drill_upgrades, player_upgrades)
 				local template = Drill.create_upgrades(0, 0, 0, false, false)
@@ -1732,6 +1881,7 @@ if string.lower(RequiredScript) == "lib/units/props/securitylockgui" then
 	function SecurityLockGui:init(unit, ...)
 		self._info_key = tostring(unit:key())
 		managers.gameinfo:event("timer", "create", self._info_key, unit, self, "securitylock")
+		managers.gameinfo:event("timer", "set_total_bars", self._info_key, self._bars)
 		init_original(self, unit, ...)
 	end
 
@@ -1740,9 +1890,11 @@ if string.lower(RequiredScript) == "lib/units/props/securitylockgui" then
 		managers.gameinfo:event("timer", "update", self._info_key, t, self._current_timer, self._current_timer / self._timer)
 	end
 
-	function SecurityLockGui:_start(...)
+	function SecurityLockGui:_start(bar, ...)
+		managers.gameinfo:event("timer", "set_current_bar", self._info_key, bar)
 		managers.gameinfo:event("timer", "set_active", self._info_key, true)
-		return _start_original(self, ...)
+
+		return _start_original(self, bar, ...)
 	end
 
 	function SecurityLockGui:_set_done(...)
@@ -1851,12 +2003,12 @@ if string.lower(RequiredScript) == "lib/managers/group_ai_states/groupaistatebas
 		if unit:brain()._logic_data.is_converted then
 			local key = tostring(unit:key())
 			local peer_id = peer_unit and managers.network:session():peer_by_unit(peer_unit):id() or managers.network:session():local_peer():id()
-			local owner_base = peer_id and peer_unit and peer_id ~= managers.network:session():local_peer():id() and peer_unit:base() or managers.player
-			local damage_mult = (owner_base:upgrade_value("player", "convert_enemies_damage_multiplier", 1) or 1) --* (owner_base:upgrade_value("player", "passive_convert_enemies_damage_multiplier", 1) or 1)
+			local owner_base = peer_id and peer_id ~= managers.network:session():local_peer():id() and peer_unit:base() or managers.player
+			local damage_mult = (owner_base:upgrade_value("player", "convert_enemies_damage_multiplier", 0) or 0)
 
 			managers.gameinfo:event("minion", "add", key, { unit = unit })
 			managers.gameinfo:event("minion", "set_owner", key, { owner = peer_id })
-			if damage_mult > 1 then
+			if damage_mult > 0 then
 				managers.gameinfo:event("minion", "set_damage_multiplier", key, { damage_multiplier = damage_mult })
 			end
 		end
@@ -1881,8 +2033,8 @@ if string.lower(RequiredScript) == "lib/managers/group_ai_states/groupaistatebas
 	end
 
 	function GroupAIStateBase:_update_hostage_count()
-        managers.player:update_hostage_situation(self._hostage_headcount)
-    
+		managers.player:update_hostage_situation(self._hostage_headcount)
+
 		local police_hostages = 0
 		local security_hostages = 0
 		local civilian_hostages = self._hostage_headcount
@@ -2170,7 +2322,7 @@ if string.lower(RequiredScript) == "lib/units/equipment/ecm_jammer/ecmjammerbase
 	end
 
 	function ECMJammerBase:_set_feedback_active(state, ...)
-		if not state and self._feedback_active then
+		if not state and self._feedback_active and managers.network and managers.network:session() and managers.network:session():local_peer() and managers.network:session():local_peer():id() then
 			local peer_id = managers.network:session():local_peer():id()
 
 			if self._owner_id == peer_id and managers.player:has_category_upgrade("ecm_jammer", "can_retrigger") then
@@ -2227,9 +2379,7 @@ if string.lower(RequiredScript) == "lib/units/equipment/ecm_jammer/ecmjammerbase
 	end
 
 	function ECMJammerBase:contour_interaction(...)
-		local owner_unit = self:owner()
-		local player_unit = managers.player:player_unit()
-		if alive(owner_unit) and alive(player_unit) and owner_unit:key() == player_unit:key() and managers.player:has_category_upgrade("ecm_jammer", "can_activate_feedback") then
+		if managers.network:session() and self._owner_id == managers.network:session():local_peer():id() and managers.player:has_category_upgrade("ecm_jammer", "can_activate_feedback") then
 			self._retrigger_delay = nil
 			managers.gameinfo:event("ecm", "set_retrigger_active", self._ecm_unit_key, { retrigger_active = false })
 		end
@@ -2668,10 +2818,13 @@ if string.lower(RequiredScript) == "lib/managers/playermanager" then
 	local chk_wild_kill_counter_original = PlayerManager.chk_wild_kill_counter
 	local set_synced_cocaine_stacks_original = PlayerManager.set_synced_cocaine_stacks
 	local add_grenade_amount_original = PlayerManager.add_grenade_amount
-	local on_throw_grenade_original = PlayerManager.on_throw_grenade
-	local activate_ability_original = PlayerManager.activate_ability
-	local speed_up_ability_cooldown_original = PlayerManager.speed_up_ability_cooldown
+	local start_ability_timer_original = PlayerManager.start_ability_timer
+	local stop_ability_timer_original = PlayerManager.stop_ability_timer
+	local speed_up_ability_timer_original = PlayerManager.speed_up_ability_timer
 	local _dodge_shot_gain_original = PlayerManager._dodge_shot_gain
+	local replenish_grenades_original = PlayerManager.replenish_grenades
+	local _on_grenade_cooldown_end_original = PlayerManager._on_grenade_cooldown_end
+	local speed_up_grenade_cooldown_original = PlayerManager.speed_up_grenade_cooldown
 	local start_custom_cooldown_original = PlayerManager.start_custom_cooldown
 	local _set_body_bags_amount_original = PlayerManager._set_body_bags_amount
 
@@ -3000,40 +3153,11 @@ if string.lower(RequiredScript) == "lib/managers/playermanager" then
 		add_grenade_amount_original(self, ...)
 
 		local gain_throwable_per_kill = managers.player:upgrade_value("team", "crew_throwable_regen", 0)
-		if gain_throwable_per_kill > 0 and not self:got_max_grenades() then
+		if gain_throwable_per_kill > 0 and not self:got_ability() and not self:got_max_grenades() then
 			managers.gameinfo:event("buff", "activate", "crew_throwable_regen")
-			managers.gameinfo:event("buff", "set_stack_count", "crew_throwable_regen", { stack_count = (gain_throwable_per_kill - (self._throw_regen_kills or 0)) })
+			managers.gameinfo:event("buff", "set_stack_count", "crew_throwable_regen", { stack_count = (gain_throwable_per_kill - (self._throw_regen_kills or 0) + 1) })
 		else
 			managers.gameinfo:event("buff", "deactivate", "crew_throwable_regen")
-		end
-	end
-
-	function PlayerManager:on_throw_grenade(...)
-		on_throw_grenade_original(self, ...)
-
-		local equipped_grenade = managers.blackmarket:equipped_grenade()
-		if self["_cooldown_" .. equipped_grenade] then
-			local t = TimerManager:game():time()
-			local duration = self["_cooldown_" .. equipped_grenade] - t
-			managers.gameinfo:event("timed_buff", "activate", equipped_grenade .. "_debuff", { duration = duration })
-		end
-	end
-
-	function PlayerManager:activate_ability(ability, ...)
-		activate_ability_original(self, ability, ...)
-
-		if self["_cooldown_" .. ability] then
-			local t = TimerManager:game():time()
-			local duration = self["_cooldown_" .. ability] - t
-			managers.gameinfo:event("timed_buff", "activate", ability .. "_debuff", { duration = duration })
-		end
-	end
-
-	function PlayerManager:speed_up_ability_cooldown(ability, time, ...)
-		speed_up_ability_cooldown_original(self, ability, time, ...)
-
-		if self["_cooldown_" .. ability] then
-			managers.gameinfo:event("timed_buff", "decrease_duration", ability .. "_debuff", { decrease = time })
 		end
 	end
 
@@ -3051,14 +3175,51 @@ if string.lower(RequiredScript) == "lib/managers/playermanager" then
 		return _dodge_shot_gain_original(self, gain_value, ...)
 	end
 
-	function PlayerManager:start_custom_cooldown(category, upgrade, ...)
-		start_custom_cooldown_original(self, category, upgrade, ...)
-		managers.gameinfo:event("timed_buff", "activate", tostring(upgrade) .. "_debuff", { expire_t = self["_cooldown_" .. category .. "_" .. upgrade] })
+	function PlayerManager:replenish_grenades(cooldown, ...)
+		if not self:has_active_timer("replenish_grenades") then
+			local id = managers.blackmarket:equipped_grenade()
+
+			if id then
+				managers.gameinfo:event("buff", "activate", id .. "_debuff")
+				managers.gameinfo:event("buff", "set_duration", id .. "_debuff", { duration = cooldown })
+			end
+		end
+
+		return replenish_grenades_original(self, cooldown, ...)
+ 	end
+
+	function PlayerManager:_on_grenade_cooldown_end(...)
+		local id = managers.blackmarket:equipped_grenade()
+
+		if id then
+			managers.gameinfo:event("buff", "deactivate", id .. "_debuff")
+		end
+
+		return _on_grenade_cooldown_end_original(self, ...)
+	end
+
+	function PlayerManager:speed_up_grenade_cooldown(time, ...)
+		if self:has_active_timer("replenish_grenades") then
+			local equipped_grenade = managers.blackmarket:equipped_grenade()
+			managers.gameinfo:event("timed_buff", "change_expire", equipped_grenade .. "_debuff", { difference = -time })
+		end
+
+		return speed_up_grenade_cooldown_original(self, time, ...)
+	end
+
+	function PlayerManager:start_custom_cooldown(category, upgrade, cooldown, ...)
+		managers.gameinfo:event("timed_buff", "activate", upgrade .. "_debuff", { duration = cooldown })
+		return start_custom_cooldown_original(self, category, upgrade, cooldown, ...)
 	end
 
 	function PlayerManager:_set_body_bags_amount(body_bags_amount)
 		managers.gameinfo:event("bodybags", "set", nil, body_bags_amount)
-		_set_body_bags_amount_original(self, body_bags_amount)
+		return _set_body_bags_amount_original(self, body_bags_amount)
+	end
+
+	function PlayerManager:got_ability(grenade_id)
+		local equipped_grenade = grenade_id or managers.blackmarket:equipped_grenade()
+		return tweak_data.blackmarket.projectiles[equipped_grenade].ability
 	end
 
 end
@@ -3231,6 +3392,56 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playermovement" then
 	end
 end
 
+if string.lower(RequiredScript) == "lib/units/beings/player/playerinventory" then
+
+	local _start_jammer_effect_original = PlayerInventory._start_jammer_effect
+	local _stop_jammer_effect_original = PlayerInventory._stop_jammer_effect
+	local _start_feedback_effect_original = PlayerInventory._start_feedback_effect
+	local _stop_feedback_effect_original = PlayerInventory._stop_feedback_effect
+	local get_jammer_time_original = PlayerInventory.get_jammer_time
+
+	function PlayerInventory:_start_jammer_effect(end_time, ...)
+		managers.gameinfo:event("buff", "activate", "pocket_ecm_jammer")
+		managers.gameinfo:event("buff", "set_duration", "pocket_ecm_jammer", { expire_t = end_time or ((self:get_jammer_time() or 0) + (TimerManager:game():time() or 0)) })
+
+		return _start_jammer_effect_original(self, end_time, ...)
+	end
+
+	function PlayerInventory:_stop_jammer_effect(...)
+		if self._jammer_data and self._jammer_data.effect == "jamming" then
+			managers.gameinfo:event("buff", "deactivate", "pocket_ecm_jammer")
+		end
+
+		return _stop_jammer_effect_original(self, ...)
+	end
+
+	function PlayerInventory:_start_feedback_effect(end_time, ...)
+		managers.gameinfo:event("buff", "activate", "pocket_ecm_jammer")
+		managers.gameinfo:event("buff", "set_duration", "pocket_ecm_jammer", { expire_t = end_time or ((self:get_jammer_time() or 0) + (TimerManager:game():time() or 0)) })
+
+		return _start_feedback_effect_original(self, end_time, ...)
+	end
+
+	function PlayerInventory:_stop_feedback_effect(...)
+		if self._jammer_data and self._jammer_data.effect == "feedback" then
+			managers.gameinfo:event("buff", "deactivate", "pocket_ecm_jammer")
+		end
+
+		return _stop_feedback_effect_original(self, ...)
+	end
+
+	function PlayerInventory:get_jammer_time(...)	-- TMP: Fix for non existing upgrade values causing crashes
+		local tweak = tweak_data.upgrades.values.player.pocket_ecm_jammer_base
+		local result
+
+		if self._unit:base():upgrade_value("player", "pocket_ecm_jammer_base") then
+			result = get_jammer_time_original(self, ...)
+		end
+
+		return result or tweak and tweak[1] and tweak[1].duration or 6
+	end
+end
+
 if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandard" then
 
 	local _do_action_intimidate_original = PlayerStandard._do_action_intimidate
@@ -3397,9 +3608,10 @@ if string.lower(RequiredScript) == "lib/units/beings/player/states/playerstandar
 	end
 
 	function PlayerStandard:_update_equip_weapon_timers(...)
+		local old_equip_weapon_expire_t = self._equip_weapon_expire_t
 		local value = _update_equip_weapon_timers_original(self, ...)
 
-		if not self._equip_weapon_expire_t then
+		if old_equip_weapon_expire_t and not self._equip_weapon_expire_t then
 			managers.gameinfo:event("player_action", "deactivate", "interact_debuff")
 		end
 
@@ -3509,7 +3721,6 @@ end
 
 if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 
-	local init_original = PlayerDamage.init
 	local add_damage_to_hot_original = PlayerDamage.add_damage_to_hot
 	local set_health_original = PlayerDamage.set_health
 	local _upd_health_regen_original = PlayerDamage._upd_health_regen
@@ -3518,9 +3729,12 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 	local _update_armor_grinding_original = PlayerDamage._update_armor_grinding
 	local _on_damage_armor_grinding_original = PlayerDamage._on_damage_armor_grinding
 	local change_regenerate_speed_original = PlayerDamage.change_regenerate_speed
-	local build_suppression_original = PlayerDamage.build_suppression
+	local _on_damage_event_original = PlayerDamage._on_damage_event
 	local set_armor_original = PlayerDamage.set_armor
 	local _check_bleed_out_original = PlayerDamage._check_bleed_out
+	local _update_delayed_damage_original = PlayerDamage._update_delayed_damage
+	local delay_damage_original = PlayerDamage.delay_damage
+	local clear_delayed_damage_original = PlayerDamage.clear_delayed_damage
 
 	local HEALTH_RATIO_BONUSES = {
 		melee_damage_health_ratio_multiplier 			= { category = "melee", buff_id = "berserker" },
@@ -3539,26 +3753,6 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 	local LAST_ARMOR_REGEN_BUFF_RESET = 0
 	local LAST_CHECK_T = 0
 	local ARMOR_GRIND_ACTIVE = false
-
-	function PlayerDamage:init(...)
-		init_original(self, ...)
-
-		if managers.player:has_category_upgrade("player", "damage_to_armor") then
-			local function on_damage(dmg_info)
-				if self._unit == dmg_info.attacker_unit then
-					local t = Application:time()
-					if (self._damage_to_armor.elapsed == t) or (t - self._damage_to_armor.elapsed > self._damage_to_armor.target_tick) then
-						managers.gameinfo:event("timed_buff", "activate", "anarchist_armor_recovery_debuff", { t = t, duration = self._damage_to_armor.target_tick })
-					end
-				end
-			end
-
-			CopDamage.register_listener("anarchist_debuff_listener", {"on_damage"}, on_damage)
-		end
-
-		self._listener_holder:add("custom_on_damage", { "on_damage" }, callback(self, self, "_custom_on_damage_clbk"))
-		self._listener_holder:add("custom_on_enter_bleedout", { "on_enter_bleedout" }, callback(self, self, "_custom_on_enter_bleedout_clbk"))
-	end
 
 	function PlayerDamage:add_damage_to_hot(...)
 		local num_old_stacks = #self._damage_to_hot_stack or 0
@@ -3620,7 +3814,7 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 		local result = _upd_health_regen_original(self, t, ...)
 
 		if self._health_regen_update_timer then
-			if self._health_regen_update_timer > (old_timer or 0) and not self:full_health() then
+			if self._health_regen_update_timer > (old_timer or 0) --[[and not self:full_health()]] then
 				for buff_id, data in pairs(PASSIVE_HEALTH_REGEN) do
 					managers.gameinfo:event("buff", "set_duration", buff_id, { duration = self._health_regen_update_timer })
 				end
@@ -3659,22 +3853,29 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 		self:_check_armor_regen_timer()
 	end
 
-	function PlayerDamage:build_suppression(...)
-		build_suppression_original(self, ...)
-		if self:get_real_armor() < self:_max_armor() then
-			LAST_ARMOR_REGEN_BUFF_RESET = managers.player:player_timer():time() --Application:time()	--TMP: Test
-			self:_check_armor_regen_timer()
-		end
+	function PlayerDamage:_on_damage_event(...)
+		_on_damage_event_original(self, ...)
+		self:_check_armor_regen_timer(true)
 	end
 
 	function PlayerDamage:set_armor(armor, ...)
-		set_armor_original(self, armor, ...)
-
-		if armor >= self:_total_armor() then
+		if armor >= self:_max_armor() then
 			ARMOR_GRIND_ACTIVE = false
 			managers.gameinfo:event("player_action", "deactivate", "anarchist_armor_regeneration")
 			managers.gameinfo:event("player_action", "deactivate", "standard_armor_regeneration")
+		elseif self._armor_grinding then
+			if not ARMOR_GRIND_ACTIVE then
+				ARMOR_GRIND_ACTIVE = true
+				local t = Application:time()
+				local t_start = t - self._armor_grinding.elapsed
+				local expire_t = t_start + self._armor_grinding.target_tick
+				managers.gameinfo:event("player_action", "activate", "anarchist_armor_regeneration")
+				managers.gameinfo:event("player_action", "set_value", "anarchist_armor_regeneration", { value = self._armor_grinding.armor_value })
+				managers.gameinfo:event("player_action", "set_duration", "anarchist_armor_regeneration", { t = t_start, expire_t = expire_t })
+			end
 		end
+
+		return set_armor_original(self, armor, ...)
 	end
 
 	function PlayerDamage:_check_bleed_out(...)
@@ -3687,26 +3888,23 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 		end
 	end
 
-	function PlayerDamage:_custom_on_damage_clbk()
-		if not self:is_downed() then
-			LAST_ARMOR_REGEN_BUFF_RESET = managers.player:player_timer():time() --Application:time()	--TMP: Test
-			self:_check_armor_regen_timer()
-		end
-	end
-
-	function PlayerDamage:_check_armor_regen_timer()
-		if self._regenerate_timer and not self:is_downed() then
+	local REGEN_EXPIRE_T = 0
+	function PlayerDamage:_check_armor_regen_timer(reset)
+		if not self._armor_grinding and not self:is_downed() and self._regenerate_timer and self:get_real_armor() < self:_max_armor() then
 			local t = managers.player:player_timer():time()
-			local duration = self._regenerate_timer / (self._regenerate_speed or 1)
+			local armor_regen_delay = self._regenerate_timer / (self._regenerate_speed or 1)
+			local suppression_delay = 0
 
-			if self._supperssion_data.decay_start_t and self._supperssion_data.decay_start_t > t then
-				duration = duration + (self._supperssion_data.decay_start_t - t)
+			if self._supperssion_data.decay_start_t and self._supperssion_data.value == tweak_data.player.suppression.max_value then
+				suppression_delay = self._supperssion_data.decay_start_t - t
 			end
 
-			if duration > 0 and t > LAST_CHECK_T then
-				LAST_CHECK_T = t
+			local expire_t = t + armor_regen_delay + suppression_delay
+
+			if expire_t ~= REGEN_EXPIRE_T then
+				REGEN_EXPIRE_T = expire_t
 				managers.gameinfo:event("player_action", "activate", "standard_armor_regeneration")
-				managers.gameinfo:event("player_action", "set_duration", "standard_armor_regeneration", { t = LAST_ARMOR_REGEN_BUFF_RESET, duration = duration })
+				managers.gameinfo:event("player_action", reset and "set_duration" or "set_expire", "standard_armor_regeneration", { duration = armor_regen_delay + suppression_delay })
 			end
 		end
 	end
@@ -3722,7 +3920,47 @@ if string.lower(RequiredScript) == "lib/units/beings/player/playerdamage" then
 					managers.gameinfo:event("buff", "deactivate", buff_id)
 				end
 			end
+
+			managers.gameinfo:event("buff", "deactivate", "delayed_damage")
 		end
+	end
+
+	function PlayerDamage:_update_delayed_damage(t, ...)
+		local result = _update_delayed_damage_original(self, t, ...)
+
+		if self._delayed_damage.next_tick then
+			managers.gameinfo:event("buff", "set_value", "delayed_damage", { value = math.round((self:remaining_delayed_damage()) * 10) })
+		end
+
+		return result
+	end
+
+	local DELAYED_DAMAGE_DURATION = math.round(1 / (tweak_data.upgrades.values.player.damage_control_passive[1][2] * 0.01))
+	function PlayerDamage:delay_damage(damage, seconds, ...)
+		local has_calm = managers.player:has_category_upgrade("player", "damage_control_auto_shrug")
+		if not self._delayed_damage.next_tick then
+			if has_calm then
+				managers.gameinfo:event("buff", "activate", "delayed_damage")
+			end
+			managers.gameinfo:event("buff", "activate", "delayed_damage_debuff")
+		end
+
+		local t = TimerManager:game():time()
+		if has_calm then
+			managers.gameinfo:event("buff", "set_duration", "delayed_damage", { t = t, duration = managers.player:upgrade_value("player", "damage_control_auto_shrug") })
+		end
+
+		managers.gameinfo:event("buff", "set_duration", "delayed_damage_debuff", { t = t, duration = DELAYED_DAMAGE_DURATION })
+		managers.gameinfo:event("buff", "set_value", "delayed_damage", { value = math.round((self:remaining_delayed_damage() + damage) * 10) })
+
+		return delay_damage_original(self, damage, seconds, ...)
+	end
+
+	function PlayerDamage:clear_delayed_damage(...)
+		managers.gameinfo:event("buff", "deactivate", "delayed_damage_debuff")
+		managers.gameinfo:event("buff", "deactivate", "delayed_damage")
+
+		return clear_delayed_damage_original(self, ...)
 	end
 end
 
@@ -3799,35 +4037,15 @@ end
 if string.lower(RequiredScript) == "lib/player_actions/skills/playeractionunseenstrike" then
 
 	local unseenstrike_original = PlayerAction.UnseenStrike.Function
-	local unseenstrike_start_original = PlayerAction.UnseenStrikeStart.Function
 
 	function PlayerAction.UnseenStrike.Function(player_manager, min_time, ...)
 		local function on_damage_taken()
-			managers.gameinfo:event("buff", "activate", "unseen_strike_debuff")
-			managers.gameinfo:event("buff", "set_duration", "unseen_strike_debuff", { duration = min_time })
+			managers.gameinfo:event("timed_buff", "activate", "unseen_strike_debuff", { duration = min_time })
 		end
 
-		managers.player:register_message(Message.OnPlayerDamage, "unseen_strike_debuff_listener", on_damage_taken)
-		managers.gameinfo:event("buff", "activate", "unseen_strike_debuff")
-		on_damage_taken()
+		player_manager:register_message(Message.OnPlayerDamage, "unseen_strike_debuff_listener", on_damage_taken)
 		unseenstrike_original(player_manager, min_time, ...)
-		managers.player:unregister_message(Message.OnPlayerDamage, "unseen_strike_debuff_listener")
-		managers.gameinfo:event("buff", "deactivate", "unseen_strike_debuff")
-	end
-
-	function PlayerAction.UnseenStrikeStart.Function(player_manager, max_duration, ...)
-		managers.gameinfo:event("buff", "deactivate", "unseen_strike_debuff")
-
-		local function on_damage_taken()
-			managers.gameinfo:event("buff", "deactivate", "unseen_strike")
-		end
-
-		managers.player:register_message(Message.OnPlayerDamage, "unseen_strike_buff_listener", on_damage_taken)
-		managers.gameinfo:event("buff", "activate", "unseen_strike")
-		managers.gameinfo:event("buff", "set_duration", "unseen_strike", { duration = max_duration })
-		unseenstrike_start_original(player_manager, max_duration, ...)
-		managers.player:unregister_message(Message.OnPlayerDamage, "unseen_strike_buff_listener")
-		managers.gameinfo:event("buff", "deactivate", "unseen_strike")
+		player_manager:unregister_message(Message.OnPlayerDamage, "unseen_strike_debuff_listener")
 	end
 
 end
@@ -3868,6 +4086,75 @@ if string.lower(RequiredScript) == "lib/player_actions/skills/playeractiontrigge
 		managers.gameinfo:event("buff", "set_duration", "trigger_happy", { expire_t = max_time })
 		trigger_happy_original(player_manager, damage_bonus, max_stacks, max_time, ...)
 		managers.gameinfo:event("buff", "deactivate", "trigger_happy")
+	end
+
+end
+
+if string.lower(RequiredScript) == "lib/player_actions/skills/playeractiontagteam" then
+
+	local tag_team_original = PlayerAction.TagTeam.Function
+	local tag_team_tagged_original = PlayerAction.TagTeamTagged.Function
+
+	local function GetUnitName(unit)
+		local name = "N/A"
+		if unit:in_slot(3) or unit:in_slot(5) then	-- Human criminal (mask off/on)
+			local peer = managers.network:session() and managers.network:session():peer_by_unit(unit)
+			name = peer and peer:name()
+		elseif unit:in_slot(16) or unit:in_slot(24) then	-- Bot (mask on/off)/Joker
+			local key = tostring(unit:key())
+			local tweak_id
+			if managers.gameinfo:get_minions(key) then	-- Joker
+				tweak_id = unit:base()._tweak_table
+			else -- Bot
+				tweak_id = CriminalsManager.convert_new_to_old_character_workname(managers.criminals:character_name_by_unit(unit))
+			end
+			name = WolfHUD:getCharacterName(tweak_id, false)
+		end
+		return name
+	end
+
+	function PlayerAction.TagTeam.Function(tagged, owner, ...)
+		local on_dmg_listener_key = string.format("gameinfo_tag_team_on_damage_listener_%s", tostring(owner:key()))
+		local tagged_name = GetUnitName(tagged)
+		local base_values = managers.player:upgrade_value("player", "tag_team_base")
+		local duration = base_values.duration or 0
+		managers.gameinfo:event("timed_buff", "activate", "tag_team", { duration = duration })
+		managers.gameinfo:event("buff", "set_value", "tag_team", { value = tagged_name })
+
+		CopDamage.register_listener(on_dmg_listener_key, {"on_damage"}, function(damage_info)
+			local was_killed = damage_info.result.type == "death"
+			local valid_player = damage_info.attacker_unit == owner or damage_info.attacker_unit == tagged
+
+			if was_killed and valid_player then
+				managers.gameinfo:event("timed_buff", "change_expire", "tag_team", { difference = base_values.kill_extension })
+			end
+		end)
+		tag_team_original(tagged, owner, ...)
+		CopDamage.unregister_listener(on_dmg_listener_key)
+	end
+
+	function PlayerAction.TagTeamTagged.Function(tagged, owner, ...)
+		local on_dmg_listener_key = string.format("gameinfo_tag_team_tagged_on_damage_listener_%s", tostring(owner:key()))
+
+		if tagged == managers.player:local_player() then
+			local tagged_name = GetUnitName(owner)
+			local base_values = managers.player:upgrade_value("player", "tag_team_base")
+			local duration = base_values.duration or 0
+			managers.gameinfo:event("timed_buff", "activate", "tag_team", { duration = duration })
+			managers.gameinfo:event("buff", "set_value", "tag_team", { value = tagged_name })
+
+			CopDamage.register_listener(on_dmg_listener_key, {"on_damage"}, function(damage_info)
+				local was_killed = damage_info.result.type == "death"
+				local valid_player = damage_info.attacker_unit == owner or damage_info.attacker_unit == tagged
+
+				if was_killed and valid_player then
+					managers.gameinfo:event("timed_buff", "change_expire", "tag_team", { difference = base_values.kill_extension })
+				end
+			end)
+		end
+
+		tag_team_tagged_original(tagged, owner, ...)
+		CopDamage.unregister_listener(on_dmg_listener_key)
 	end
 
 end

@@ -343,12 +343,13 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 
 			for i, component in ipairs(self._all_components) do
 				component:set_is_ai(not self._human_layout)
+				component:set_is_waiting(self._is_waiting)
 			end
-
+--[[
 			for i, component in ipairs(self._all_components) do
 				component:set_is_waiting(self._is_waiting)
 			end
-
+]]
 			self:_rebuild_layout()
 		end
 	end
@@ -547,16 +548,40 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self:call_listeners("custom_radial", data.current, data.total)
 	end
 
-	function HUDTeammateCustom:activate_ability_radial(time)	--Teammates, handled in update function.
-		self:call_listeners("activate_ability", time)
+	function HUDTeammateCustom:activate_ability_radial(time_left, time_total)	--Teammates, handled in update function.
+		self:call_listeners("activate_ability", time_left, time_total or time_left)
+
+		if self:is_local_player() then
+			local current_time = managers.game_play_central:get_heist_timer() or 0
+			managers.network:session():send_to_peers("sync_ability_hud", time_left + current_time, time_total or time_left)
+		end
 	end
 
 	function HUDTeammateCustom:set_ability_radial(data)		--Player
 		self:call_listeners("ability_radial", data.current, data.total)
 	end
 
-	function HUDTeammateCustom:set_ability_cooldown(data)
-		self:call_listeners("ability_cooldown", math.ceil(data.cooldown or 0))
+	function HUDTeammateCustom:set_delayed_damage(damage)
+		local player_unit = managers.player:player_unit()
+		local player_damage = player_unit and player_unit:character_damage()
+		if player_damage then
+			local data = {
+				damage = damage,
+				health = player_damage:get_real_health(),
+				armor = player_damage:get_real_armor(),
+				total_health = player_damage:_max_health(),
+				total_armor = player_damage:_max_armor(),
+			}
+			self:call_listeners("delayed_damage", data)
+		end
+
+		if self:is_local_player() then
+			managers.network:session():send_to_peers("sync_delayed_damage_hud", damage)
+		end
+	end
+
+	function HUDTeammateCustom:set_ability_icon(icon)
+		self:call_listeners("ability_icon", icon)
 	end
 
 	function HUDTeammateCustom:set_weapon_firemode(index, fire_mode)
@@ -578,11 +603,24 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 	end
 
 	function HUDTeammateCustom:set_grenades_amount(data)
-		if data.has_cooldown then
-			self:set_ability_cooldown(data)
-		elseif data.amount then
+		if data.amount then
 			self:call_listeners("throwable_amount", data.amount)
 		end
+	end
+
+	function HUDTeammateCustom:set_grenade_cooldown(data)
+		if data and data.end_time and data.duration then
+			local time_left = data.end_time - managers.game_play_central:get_heist_timer()
+			self:call_listeners("throwable_cooldown", time_left, data.duration)
+
+			if self:is_local_player() then
+				managers.network:session():send_to_peers("sync_grenades_cooldown", data.end_time, data.duration)
+			end
+		end
+	end
+
+	function HUDTeammateCustom:animate_grenade_flash(...)
+		self:call_listeners("throwable_cooldown_stop")
 	end
 
 	function HUDTeammateCustom:set_cable_tie(data)
@@ -754,9 +792,9 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		end
 	end
 
-	function HUDTeammateCustom:teammate_progress(enabled, tweak_data, timer, success)
+	function HUDTeammateCustom:teammate_progress(enabled, tweak_id, timer, success)
 		if enabled then
-			self:call_listeners("interaction_start", tweak_data, timer)
+			self:call_listeners("interaction_start", tweak_id, timer)
 		else
 			self:call_listeners("interaction_stop", success)
 		end
@@ -1769,7 +1807,6 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._health_radial = self._panel:bitmap({
 			name = "health_radial",
 			texture = "guis/textures/pd2/hud_health",
-			texture_rect = { 64, 0, -64, 64 },
 			render_template = "VertexColorTexturedRadial",
 			blend_mode = "add",
 			color = Color(1, 1, 1),
@@ -1777,11 +1814,11 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			w = self._size,
 			layer = health_bg:layer() + 1,
 		})
+		self._health_radial:set_texture_rect(self._health_radial:texture_width(), 0, -self._health_radial:texture_width(), self._health_radial:texture_height())
 
 		self._stored_health_radial = self._panel:bitmap({
 			name = "stored_health_radial",
 			texture = "guis/textures/pd2/hud_health",
-			texture_rect = { 64, 0, -64, 64 },
 			render_template = "VertexColorTexturedRadial",
 			blend_mode = "add",
 			color = Color(0, 0, 0),
@@ -1790,24 +1827,24 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			w = self._size,
 			layer = self._health_radial:layer() - 1,
 		})
+		self._stored_health_radial:set_texture_rect(self._stored_health_radial:texture_width(), 0, -self._stored_health_radial:texture_width(), self._stored_health_radial:texture_height())
 
 		self._armor_radial = self._panel:bitmap({
 			name = "armor_radial",
 			texture = "guis/textures/pd2/hud_shield",
-			texture_rect = { 64, 0, -64, 64 },
 			render_template = "VertexColorTexturedRadial",
 			blend_mode = "add",
-			color = Color(1, 1, 1),
+			color = Color(0, 1, 1),
 			layer = self._stored_health_radial:layer() + 1,
 			h = self._size,
 			w = self._size,
 			layer = self._stored_health_radial:layer() + 1,
 		})
+		self._armor_radial:set_texture_rect(self._armor_radial:texture_width(), 0, -self._armor_radial:texture_width(), self._armor_radial:texture_height())
 
 		self._stamina_radial = self._panel:bitmap({
 			name = "radial_shield",
 			texture = "guis/textures/pd2/hud_radial_rim",
-			texture_rect = { 0, 0, 64, 64 },
 			render_template = "VertexColorTexturedRadial",
 			blend_mode = "add",
 			color = Color(1, 0, 0),
@@ -1865,7 +1902,6 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		local center_bg = self._panel:bitmap({
 			name = "center_bg",
 			texture = "guis/textures/pd2/crimenet_marker_glow",
-			texture_rect = { 0, 0, 64, 64 },
 			blend_mode = "normal",
 			color = Color.black,
 			alpha = 0.65,
@@ -1900,7 +1936,6 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._custom_radial_icon = self._panel:bitmap({
 			name = "custom_radial_icon",
 			texture = "guis/textures/pd2/hud_swansong",
-			texture_rect = { 0, 0, 64, 64 },
 			render_template = "VertexColorTexturedRadial",
 			blend_mode = "add",
 			color = Color(1, 0, 0, 0),
@@ -1912,8 +1947,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 
 		self._ability_radial_icon = self._panel:bitmap({
 			name = "custom_radial_icon",
-			texture = "guis/dlcs/chico/textures/pd2/hud_fearless",
-			texture_rect = { 0, 0, 64, 64 },
+			texture = "guis/textures/pd2/hud_fearless",
 			render_template = "VertexColorTexturedRadial",
 			blend_mode = "add",
 			color = Color(1, 0, 0, 0),
@@ -1926,26 +1960,52 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._maniac_absorb_radial = self._panel:bitmap({
 			name = "maniac_absorb_radial",
 			texture = "guis/dlcs/coco/textures/pd2/hud_absorb_shield",
-			texture_rect = { 0, 0, 64, 64 },
 			render_template = "VertexColorTexturedRadial",
 			w = self._size * 0.92,
 			h = self._size * 0.92,
-			color = Color.black,
+			color = Color(1, 0, 0, 0),
+			visible = false,
 			layer = self._condition_icon:layer() - 1,
 		})
 		self._maniac_absorb_radial:set_center(self._size / 2, self._size / 2)
 
+		self._radial_delayed_damage_armor = self._panel:bitmap({
+			texture = "guis/textures/pd2/hud_dot_shield",
+			name = "radial_delayed_damage_armor",
+			visible = false,
+			render_template = "VertexColorTexturedRadialFlex",
+			layer = self._condition_icon:layer() - 1,
+			w = self._size,
+			h = self._size
+		})
+
+		self._radial_delayed_damage_health = self._panel:bitmap({
+			texture = "guis/textures/pd2/hud_dot",
+			name = "radial_delayed_damage_health",
+			visible = false,
+			render_template = "VertexColorTexturedRadialFlex",
+			layer = self._condition_icon:layer() - 1,
+			w = self._size,
+			h = self._size
+		})
+
 		--self._maniac_stack_radial = ...
-		self._components = {health_bg, self._health_radial, self._stored_health_radial, self._armor_radial, --[[self._stamina_radial,]] self._damage_indicator, self._downs_counter, self._detection_counter, center_bg, self._condition_icon, self._custom_radial_icon, self._ability_radial_icon, self._maniac_absorb_radial}
+		self._components = { health_bg, self._health_radial, self._stored_health_radial, self._armor_radial, --[[self._stamina_radial,]] self._damage_indicator, self._downs_counter, self._detection_counter, center_bg, self._condition_icon, self._custom_radial_icon, self._ability_radial_icon, self._maniac_absorb_radial, self._radial_delayed_damage_armor, self._radial_delayed_damage_health }
 
 		local tweak = tweak_data.upgrades
 		self._max_absorb = tweak.cocaine_stacks_dmg_absorption_value * tweak.values.player.cocaine_stack_absorption_multiplier[1] * tweak.max_total_cocaine_stacks  / tweak.cocaine_stacks_convert_levels[2]
+
 		self._stored_health = 0
 		self._stored_health_max = 0
-		self._downs = 0
-		self._max_downs = managers.crime_spree:modify_value("PlayerDamage:GetMaximumLives", (Global.game_settings.difficulty == "sm_wish" and 2 or tweak_data.player.damage.LIVES_INIT)) - 1
-		self._reviver_count = 0
+
 		self._risk = 0
+		self._downs = 0
+		self._max_downs = (Global.game_settings.one_down and 2 or tweak_data.player.damage.LIVES_INIT) - 1
+		if managers.modifiers and managers.modifiers.modify_value then
+			self._max_downs = managers.modifiers:modify_value("PlayerDamage:GetMaximumLives", self._max_downs)
+		end
+
+		self._reviver_count = 0
 
 		self._owner:register_listener("PlayerStatus", { "health" }, callback(self, self, "set_health"), false)
 		self._owner:register_listener("PlayerStatus", { "stored_health" }, callback(self, self, "set_stored_health"), false)
@@ -1966,6 +2026,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._owner:register_listener("PlayerStatus", { "ability_radial" }, callback(self, self, "set_ability_progress"), false)
 		self._owner:register_listener("PlayerStatus", { "activate_ability" }, callback(self, self, "set_ability_active"), false)
 		self._owner:register_listener("PlayerStatus", { "absorb_active" }, callback(self, self, "set_absorb"), false)
+		self._owner:register_listener("PlayerStatus", { "delayed_damage" }, callback(self, self, "set_delayed_damage"), false)
 		if managers.gameinfo then
 			local panel_id = self._owner._id
 			managers.gameinfo:register_listener("HealthRadial_whisper_mode_listener" .. tostring(panel_id), "whisper_mode", "change", callback(self, self, "_whisper_mode_change"))
@@ -1982,6 +2043,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			"custom_radial",
 			"ability_radial", "activate_ability",
 			"absorb_active",
+			"delayed_damage"
 		})
 		if managers.gameinfo then
 			local panel_id = self._owner._id
@@ -2021,7 +2083,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 	function PlayerInfoComponent.PlayerStatus:set_is_local_player(state)
 		if PlayerInfoComponent.PlayerStatus.super.set_is_local_player(self, state) then
 			self._stamina_radial:set_visible(self._is_local_player and self._settings.STAMINA)
-			self._max_downs = managers.crime_spree:modify_value("PlayerDamage:GetMaximumLives", (Global.game_settings.difficulty == "sm_wish" and 2 or tweak_data.player.damage.LIVES_INIT)) - 1
+			--self._max_downs = managers.modifiers:modify_value("PlayerDamage:GetMaximumLives", (Global.game_settings.one_down and 2 or tweak_data.player.damage.LIVES_INIT)) - 1
 			if self._is_local_player then
 				self._max_downs = self._max_downs + managers.player:upgrade_value("player", "additional_lives", 0)
 				self:set_revives(self._max_downs)
@@ -2194,9 +2256,9 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._ability_radial_icon:set_visible(ratio > 0)
 	end
 
-	function PlayerInfoComponent.PlayerStatus:set_ability_active(time)
+	function PlayerInfoComponent.PlayerStatus:set_ability_active(time_left, time_total)
 		self._ability_radial_icon:stop()
-		self._ability_radial_icon:animate(callback(self, self, "_animate_ability"), time)
+		self._ability_radial_icon:animate(callback(self, self, "_animate_ability"), time_left, time_total)
 	end
 
 	function PlayerInfoComponent.PlayerStatus:set_absorb(amount)
@@ -2209,6 +2271,27 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		--local r = math.clamp(data.current / data.max, 0, 1)
 		--self._maniac_stack_radial:set_visible(r > 0)
 		--self._maniac_stack_radial:set_color(Color(r, 1, 1))
+	end
+
+	function PlayerInfoComponent.PlayerStatus:set_delayed_damage(data)
+		local damage = data.damage or 0
+		local armor_max = data.total_armor or 1
+		local armor_current = data.armor or 0
+		local armor_ratio = (data.armor / data.total_armor)
+		local health_max = data.total_health or 1
+		local health_current = data.health or 0
+		local health_ratio = (data.health / data.total_health)
+		local armor_damage = damage < armor_current and damage or armor_current
+		damage = damage - armor_damage
+		local health_damage = damage < health_current and damage or health_current
+		local armor_damage_ratio = armor_damage > 0 and armor_damage / armor_max or 0
+		local health_damage_ratio = health_damage / health_max
+
+		self._radial_delayed_damage_armor:set_visible(armor_damage_ratio > 0)
+		self._radial_delayed_damage_health:set_visible(health_damage_ratio > 0)
+		self._radial_delayed_damage_armor:set_color(Color(1, armor_damage_ratio, 1 - armor_ratio, 0))
+		self._radial_delayed_damage_health:set_color(Color(1, health_damage_ratio, 1 - health_ratio, 0))
+
 	end
 
 	function PlayerInfoComponent.PlayerStatus:_animate_damage_taken(indicator)
@@ -2264,13 +2347,13 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		end
 	end
 
-	function PlayerInfoComponent.PlayerStatus:_animate_ability(radial, duration)
-		local t = duration
+	function PlayerInfoComponent.PlayerStatus:_animate_ability(radial, time_left, duration)
+		local t = duration - time_left
 		radial:show()
 
-		while t >= 0 do
+		while t < duration do
 			self._ability_radial_icon:set_color(Color(1, t / duration, 1, 1))
-			t = t - coroutine.yield()
+			t = t + coroutine.yield()
 		end
 
 		radial:hide()
@@ -3180,8 +3263,8 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 	end
 
 	function PlayerInfoComponent.Weapon:set_weapon(id, silencer)
-		local skinned = tweak_data.blackmarket.weapon_skins[id] and true
-		local bitmap_texture, text = PlayerInfoComponent.Base.get_item_icon_data(skinned and "weapon_skin" or "weapon", id)
+		local weapon_skin = tweak_data.blackmarket.weapon_skins[id] or false
+		local bitmap_texture, text = PlayerInfoComponent.Base.get_item_icon_data(weapon_skin and "weapon_skin" or "weapon", id)
 
 		self._icon_panel:child("icon"):set_image(bitmap_texture)
 		self._icon_panel:child("silencer_icon"):set_visible(silencer)
@@ -3212,6 +3295,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 
 		self._settings = settings
 		self._equipment_types = { "deployables", "cable_ties", "throwables" }
+		self._throwable_data = { amount = 0, cooldown = 0 }
 
 		local bg = self._panel:rect({
 			name = "bg",
@@ -3259,11 +3343,12 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		self._owner:register_listener("Equipment", { "deployable" }, callback(self, self, "set_deployable"), false)
 		self._owner:register_listener("Equipment", { "deployable_amount" }, callback(self, self, "set_deployable_amount"), false)
 		self._owner:register_listener("Equipment", { "deployable_amount_from_string" }, callback(self, self, "set_deployable_amount_from_string"), false)
-		self._owner:register_listener("Equipment", { "ability_cooldown" }, callback(self, self, "set_ability_cooldown"), false)
+		self._owner:register_listener("Equipment", { "throwable_cooldown" }, callback(self, self, "set_throwable_cooldown"), false)
+		self._owner:register_listener("Equipment", { "throwable_cooldown_stop" }, callback(self, self, "stop_throwable_cooldown"), false)
 	end
 
 	function PlayerInfoComponent.Equipment:destroy()
-		self._owner:unregister_listener("Equipment", { "deployable_amount_from_string", "deployable_amount", "deployable", "cable_tie_amount", "cable_tie", "throwable_amount", "throwable", "ability_cooldown" })
+		self._owner:unregister_listener("Equipment", { "deployable_amount_from_string", "deployable_amount", "deployable", "cable_tie_amount", "cable_tie", "throwable_amount", "throwable", "throwable_cooldown", "throwable_cooldown_stop" })
 		PlayerInfoComponent.Equipment.super.destroy(self)
 	end
 
@@ -3310,7 +3395,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			local panel = self._panel:child(name)
 			local panel_w = 0
 
-			if panel:visible() then
+			if panel and panel:visible() then
 				local icon = panel:child("icon")
 				local amount = panel:child("amount")
 				local _, _, text_w, _ = amount:text_rect()
@@ -3324,7 +3409,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		for _, name in ipairs(self._equipment_types) do
 			local panel = self._panel:child(name)
 
-			if panel:visible() then
+			if panel and panel:visible() then
 				local icon = panel:child("icon")
 				local amount = panel:child("amount")
 
@@ -3343,7 +3428,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 	end
 
 	function PlayerInfoComponent.Equipment:set_cable_tie(icon)
-		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon)
+		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon, {0, 0, 32, 32})
 		self._panel:child("cable_ties"):child("icon"):set_image(texture, unpack(texture_rect))
 	end
 
@@ -3357,45 +3442,65 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 	end
 
 	function PlayerInfoComponent.Equipment:set_throwable(icon)
-		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon)
+		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon, {0, 0, 32, 32})
 		self._panel:child("throwables"):child("icon"):set_image(texture, unpack(texture_rect))
 	end
 
 	function PlayerInfoComponent.Equipment:set_throwable_amount(amount)
+		self._throwable_data.amount = amount
+
+		if amount <= 0 then
+			local t = managers.player:player_timer():time()
+			if self._throwable_data.cooldown > t then
+				local time_left = self._throwable_data.cooldown - t
+				self:set_throwable_cooldown(time_left, time_left)
+				return
+			end
+		else
+			self:stop_throwable_cooldown(true)
+		end
+
 		local panel = self._panel:child("throwables")
+		local icon = panel:child("icon")
 		local text = panel:child("amount")
+
 		text:set_text(string.format("%02.0f", amount))
 		text:set_range_color(0, amount < 10 and 1 or 0, Color.white:with_alpha(0.5))
-		panel:set_visible(amount > 0)
+		panel:set_visible(amount > 0 or self._animating_throwable_cooldown)
 		self:arrange()
 	end
 
-	function PlayerInfoComponent.Equipment:set_ability_cooldown(amount)
-		local panel = self._panel:child("throwables")
-		local text = panel:child("amount")
-		text:set_text(string.format("%02.0f", math.max(amount, 1)))
-
-		if amount > 0 then
-			if not self._ability_cooldown then
-				self._ability_cooldown = true
-				text:set_color(Color('FF7575'))
+	function PlayerInfoComponent.Equipment:set_throwable_cooldown(time_left, time_total)
+		self._throwable_data.cooldown = managers.player:player_timer():time() + time_left
+		if self._throwable_data.amount <= 0 then
+			local panel = self._panel:child("throwables")
+			if self._animating_throwable_cooldown then
+				panel:stop()
+				self._animating_throwable_cooldown = nil
 			end
-		elseif self._ability_cooldown then
-			self._ability_cooldown = nil
-			text:set_color(Color.white)
+			panel:animate(callback(self, self, "_animate_throwable_cooldown"), time_left)
 		end
+	end
 
-		local text_color = self._ability_cooldown and Color('FF7575') or Color.white
-		text:set_range_color(0, amount < 10 and 1 or 0, text_color:with_alpha(0.5))
+	function PlayerInfoComponent.Equipment:stop_throwable_cooldown(visibility)
+		if self._animating_throwable_cooldown then
+			local panel = self._panel:child("throwables")
+			local icon = panel:child("icon")
+			local text = panel:child("amount")
 
-		if not panel:visible() then
-			panel:set_visible(true)
-			self:arrange()
+			panel:stop()
+			self._animating_throwable_cooldown = nil
+			text:set_color(Color.white)
+			icon:set_alpha(1)
+			if visibility ~= panel:visible() then
+				panel:set_visible(visibility)
+				self:arrange()
+			end
 		end
 	end
 
 	function PlayerInfoComponent.Equipment:set_deployable(icon)
-		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon)
+		local texture, texture_rect = tweak_data.hud_icons:get_icon_data(icon, {0, 0, 32, 32})
 		self._panel:child("deployables"):child("icon"):set_image(texture, unpack(texture_rect))
 	end
 
@@ -3447,6 +3552,24 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 		text:set_range_color(0, amount < 10 and 1 or 0, Color.white:with_alpha(0.5))
 		panel:set_visible(amount > 0)
 		self:arrange()
+	end
+
+	function PlayerInfoComponent.Equipment:_animate_throwable_cooldown(panel, time_left)
+		self._animating_throwable_cooldown = true
+		local text = panel:child("amount")
+		local icon = panel:child("icon")
+		text:set_color(Color('FF7575'))
+		icon:set_alpha(0.5)
+		panel:set_visible(true)
+		self:arrange()
+
+		while time_left > 0 and self._animating_throwable_cooldown do
+			time_left = time_left - coroutine.yield()
+			text:set_text(string.format("%02.0f", math.ceil(time_left)))
+			text:set_range_color(0, math.ceil(time_left) < 10 and 1 or 0, Color('FF7575'):with_alpha(0.5))
+		end
+
+		self:stop_throwable_cooldown(false)
 	end
 
 	PlayerInfoComponent.SpecialEquipment = PlayerInfoComponent.SpecialEquipment or class(PlayerInfoComponent.Base)
@@ -3744,7 +3867,7 @@ if RequiredScript == "lib/managers/hud/hudteammate" then
 			local text_id, macros = "hud_action_generic", {}
 			if tweak_entry and (tweak_entry.action_text_id or tweak_entry.quantity) then
 				text_id = tweak_entry.action_text_id or "hud_deploying_equipment"
-				macros = { EQUIPMENT = (tweak_entry.text_id and managers.localization:text(tweak_entry.text_id) or ""), BTN_INTERACT = managers.localization:get_default_macro("BTN_INTERACT") }
+				macros = { EQUIPMENT = (tweak_entry.text_id and managers.localization:text(tweak_entry.text_id) or "N/A"), BTN_INTERACT = managers.localization:get_default_macro("BTN_INTERACT") }
 			end
 			local text = managers.localization:to_upper_text(text_id, macros) or ""
 
@@ -4045,7 +4168,8 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 		local name_id = wbase.name_id
 		if wbase._cosmetics_data and wbase._cosmetics_data.name_id then
 			local skin_id = wbase._cosmetics_data.name_id:gsub("bm_wskn_", "")
-			if tweak_data.blackmarket.weapon_skins[skin_id] then
+			local skin_tweak = tweak_data.blackmarket.weapon_skins[skin_id]
+			if skin_tweak and not skin_tweak.is_a_color_skin and (table.contains(skin_tweak.weapon_ids or {}, weapon_id) or (skin_tweak.weapon_id and skin_tweak.weapon_id == weapon_id) ~= (skin_tweak.use_blacklist or false)) then
 				name_id = skin_id
 			end
 		end
@@ -4095,7 +4219,7 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 		return set_mugshot_voice_original(self, id, active, ...)
 	end
 
-	function HUDManager:teammate_progress(peer_id, type_index, enabled, tweak_data_id, timer, success, ...)
+	function HUDManager:teammate_progress(peer_id, type_index, enabled, tweak_data_id, ...)
 		local interact_tweak = {}
 		if type_index == 1 then
 			interact_tweak = tweak_data.interaction
@@ -4110,7 +4234,7 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 			self._teammate_panels[character_data.panel_id]:set_interaction_tweak(enabled, interact_tweak)
 		end
 
-		teammate_progress_original(self, peer_id, type_index, enabled, tweak_data_id, timer, success, ...)
+		teammate_progress_original(self, peer_id, type_index, enabled, tweak_data_id, ...)
 	end
 
 	function HUDManager:set_teammate_carry_info(i, ...)
@@ -4280,10 +4404,12 @@ if RequiredScript == "lib/managers/hudmanagerpd2" then
 			if outfit then
 				--Weapon
 				for selection, data in ipairs({ outfit.secondary, outfit.primary }) do
-					local cosmetics_id = data.cosmetics and data.cosmetics.id
 					local weapon_id = managers.weapon_factory:get_weapon_id_by_factory_id(data.factory_id)
+					local skin_id = data.cosmetics and data.cosmetics.id
+					local skin_tweak = tweak_data.blackmarket.weapon_skins[skin_id]
+					local weapon_skin = skin_tweak and not skin_tweak.is_a_color_skin and (table.contains(skin_tweak.weapon_ids or {}, weapon_id) or (skin_tweak.weapon_id and skin_tweak.weapon_id == weapon_id) ~= (skin_tweak.use_blacklist or false)) or false
 					local silencer = managers.weapon_factory:has_perk("silencer", data.factory_id, data.blueprint)
-					self:set_teammate_weapon(panel_id, selection, cosmetics_id or weapon_id, silencer)
+					self:set_teammate_weapon(panel_id, selection, weapon_skin and skin_id or weapon_id, silencer)
 
 					local tweak = tweak_data.weapon[weapon_id]
 					if tweak then

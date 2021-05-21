@@ -1,7 +1,6 @@
 if string.lower(RequiredScript) == "lib/managers/hud/hudassaultcorner" then
 	local init_original = HUDAssaultCorner.init
 	local _start_assault_original = HUDAssaultCorner._start_assault
-	local sync_set_assault_mode_original = HUDAssaultCorner.sync_set_assault_mode
 	local _set_hostage_offseted_original = HUDAssaultCorner._set_hostage_offseted
 	local set_buff_enabled_original = HUDAssaultCorner.set_buff_enabled
 	local show_point_of_no_return_timer_original = HUDAssaultCorner.show_point_of_no_return_timer
@@ -16,7 +15,7 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudassaultcorner" then
 		init_original(self, ...)
 
 		-- Waves completed are visible in Objective and overlapping with HUDList.
-		if self:is_safehouse_raid() then
+		if self:should_display_waves() then
 			local wave_panel = self._hud_panel:child("wave_panel")
 			if alive(wave_panel) then
 				wave_panel:set_alpha(0)
@@ -99,7 +98,7 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudassaultcorner" then
 				point_of_no_return_panel:set_right(80 + self._bg_box:w() + 3 + point_of_no_return_panel:child("icon_noreturnbox"):w())
 				casing_panel:set_right(80 + self._bg_box:w() + 3 + casing_panel:child("icon_casingbox"):w())
 			elseif banner_pos == 2 then
-				assault_panel:set_right(hud_w / 2 + (self._bg_box:w() + assault_panel:child("icon_assaultbox"):w()) / 2 + (buffs_panel:visible() and (self._vip_bg_box:w() + 3) / 2 or 0))
+				assault_panel:set_right(hud_w / 2 + self._bg_box:w() / 2 + assault_panel:child("icon_assaultbox"):w() + 3)
 				buffs_panel:set_x(assault_panel:left() + self._bg_box:left() - 3 - buffs_panel:w())
 				point_of_no_return_panel:set_right(hud_w / 2 + (self._bg_box:w() + point_of_no_return_panel:child("icon_noreturnbox"):w()) / 2)
 				casing_panel:set_right(hud_w / 2 + (self._bg_box:w() + casing_panel:child("icon_casingbox"):w()) / 2)
@@ -123,7 +122,7 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudassaultcorner" then
 		banner_visible = banner_visible or banner_visible == nil and (self._assault or self._point_of_no_return or self._casing)
 		local banner_pos = math.clamp(WolfHUD:getSetting({"AssaultBanner", "POSITION"}, 2), 1, 3)
 		if managers.hud and banner_pos ~= 2 then
-			local offset = banner_visible and ((self._bg_box and self._bg_box:bottom() or 0) + (self:is_safehouse_raid() and self._wave_text:h() or 0)+ 12) or 0
+			local offset = banner_visible and ((self._bg_box and self._bg_box:bottom() or 0) + (self:should_display_waves() and self._wave_text:h() or 0)+ 12) or 0
 			if banner_pos > 2 and HUDListManager then
 				managers.hud:change_list_setting("right_list_height_offset", offset)
 			elseif banner_pos < 2 then
@@ -213,29 +212,54 @@ if string.lower(RequiredScript) == "lib/managers/hud/hudassaultcorner" then
 		end
 	end
 elseif string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
-	local _change_vanillahud_setting_original = HUDManager._change_vanillahud_setting or function(...) end
+	local sync_start_assault_original = HUDManager.sync_start_assault
+	local sync_end_assault_original = HUDManager.sync_end_assault
 	local _create_downed_hud_original = HUDManager._create_downed_hud
 	local _create_custody_hud_original = HUDManager._create_custody_hud
+
 	function HUDManager:_locked_assault(status)
-		status = Network:is_server() and (managers.groupai:state():get_hunt_mode() or false) or status
-		self._assault_locked = self._assault_locked or false
+		if Network:is_server() then
+			status = managers.groupai:state():get_hunt_mode() or false
+		end
 		if self._assault_locked ~= status then
 			if self._hud_assault_corner then
 				self._hud_assault_corner:locked_assault(status)
 			end
 			self._assault_locked = status
-		end
-		return self._assault_locked
-	end
-	function HUDManager:_change_vanillahud_setting(setting)
-		if self._hud_assault_corner then
-			if setting == "assault_banner_position" then
-				self._hud_assault_corner:update_banner_pos()
-			else
-				_change_vanillahud_setting_original(self, setting)
+			if Network:is_server() and WolfHUD.Sync then
+				WolfHUD.Sync:endless_assault_status(self._assault_locked)
 			end
 		end
 	end
+
+	function HUDManager:is_assault_locked()
+		return self._assault_locked or false
+	end
+
+	function HUDManager:change_assaultbanner_setting(setting, value)
+		if self._hud_assault_corner then
+			if setting == "POSITION" then
+				self._hud_assault_corner:update_banner_pos()
+			end
+		end
+	end
+
+	function HUDManager:sync_start_assault(...)
+		sync_start_assault_original(self, ...)
+
+		if Network:is_server() then
+			self:_locked_assault()
+		end
+	end
+
+	function HUDManager:sync_end_assault(...)
+		sync_end_assault_original(self, ...)
+
+		if Network:is_server() then
+			self:_locked_assault()
+		end
+	end
+
 	function HUDManager:_create_downed_hud(...)
 		_create_downed_hud_original(self, ...)
 		local banner_pos = math.clamp(WolfHUD:getSetting({"AssaultBanner", "POSITION"}, 2), 1, 3)
@@ -245,11 +269,12 @@ elseif string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			local timer_msg = downed_panel and downed_panel:child("downed_panel"):child("timer_msg")
 			local timer = downed_hud and downed_hud.timer
 			if timer_msg and timer then
-				timer_msg:set_y(50)
+				timer_msg:set_y(65)
 				timer:set_y(math.round(timer_msg:bottom() - 6))
 			end
 		end
 	end
+
 	function HUDManager:_create_custody_hud(...)
 		_create_custody_hud_original(self, ...)
 		local banner_pos = math.clamp(WolfHUD:getSetting({"AssaultBanner", "POSITION"}, 2), 1, 3)
@@ -258,7 +283,7 @@ elseif string.lower(RequiredScript) == "lib/managers/hudmanagerpd2" then
 			local timer_msg = custody_panel and custody_panel:child("custody_panel") and custody_panel:child("custody_panel"):child("timer_msg")
 			local timer = self._hud_player_custody._timer
 			if timer_msg and timer then
-				timer_msg:set_y(50)
+				timer_msg:set_y(65)
 				timer:set_y(math.round(timer_msg:bottom() - 6))
 			end
 		end
@@ -275,7 +300,7 @@ elseif string.lower(RequiredScript) == "lib/managers/localizationmanager" then
 
 	function LocalizationManager:hud_adv_assault()
 		if WolfHUD:getSetting({"AssaultBanner", "USE_ADV_ASSAULT"}, true) then
-			if managers.hud and managers.hud:_locked_assault() then
+			if managers.hud and managers.hud:is_assault_locked() then
 				return self:text("wolfhud_locked_assault")
 			else
 				local tweak = tweak_data.group_ai.besiege.assault
